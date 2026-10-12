@@ -1,0 +1,41 @@
+{
+  "manifest_version": 2,
+  "name": "Twitch Chat Watcher",
+  "version": "2.0.0",
+  "description": "Highlights messages and plays a sound when people on your watchlist chat on Twitch.",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+  "permissions": ["storage", "notifications", "menus", "tabs"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "twitch-chat-watcher@local",
+      "strict_min_version": "115.0"
+    }
+  },
+  "background": {
+    "scripts": ["shared.js", "background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.twitch.tv/*"],
+      "js": ["shared.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "browser_action": {
+    "default_popup": "ui.html",
+    "default_title": "Twitch Chat Watcher",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "options_ui": {
+    "page": "ui.html",
+    "open_in_tab": true
+  }
+}

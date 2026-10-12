@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twitch Chat Watcher</title>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <img src="icons/icon-32.png" alt="" class="logo">
+    <div class="title">Chat Watcher <span id="offTag" class="tag" hidden>Paused</span></div>
+    <span class="switch" title="Turn the watcher on or off"><input type="checkbox" data-setting="enabled" aria-label="Watcher on"><span></span></span>
+    <button id="openFull" class="icon-btn" title="Open in a full tab" hidden>⤢</button>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="people">People</button>
+    <button data-tab="activity">Activity <span id="activityPill" class="pill" hidden></span></button>
+    <button data-tab="settings">Settings</button>
+    <button data-tab="status">Status</button>
+  </nav>
+
+  <main>
+    <!-- PEOPLE -->
+    <section data-panel="people">
+      <form id="addForm" class="add" autocomplete="off">
+        <input id="addInput" type="text" placeholder="Add usernames, e.g. shroud, pokimane" spellcheck="false">
+        <button type="submit" class="btn primary">Add</button>
+      </form>
+      <div id="addMsg" class="hint"></div>
+      <div class="list-tools">
+        <input id="filter" type="search" placeholder="Search watchlist">
+        <span id="peopleCount" class="muted"></span>
+      </div>
+      <div id="people" class="list"></div>
+      <p class="hint">Tip: right-click any message in Twitch chat and pick <b>Watch this chat user</b>.</p>
+    </section>
+
+    <!-- ACTIVITY -->
+    <section data-panel="activity" hidden>
+      <div class="list-tools">
+        <select id="activityUser" aria-label="Filter by person"><option value="">Everyone</option></select>
+        <button id="clearLog" class="btn ghost small">Clear</button>
+      </div>
+      <div id="activity" class="list"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section data-panel="settings" hidden>
+      <div class="group">
+        <h2>Alerts</h2>
+        <div class="opt"><span class="lbl">Play a sound</span>
+          <span class="switch"><input type="checkbox" data-setting="sound"><span></span></span></div>
+        <div class="opt"><span class="lbl">Sound</span>
+          <select data-setting="soundType" id="soundType"></select>
+          <button id="previewSound" class="icon-btn" title="Preview">▶</button></div>
+        <div class="opt"><span class="lbl">Volume</span>
+          <input type="range" min="0.05" max="1" step="0.05" data-setting="volume"><output data-for="volume"></output></div>
+        <div class="opt"><span class="lbl">Cooldown per person<small>Seconds before the same person can beep again</small></span>
+          <input type="number" min="0" max="3600" step="1" data-setting="cooldown"></div>
+        <div class="opt"><span class="lbl">Desktop notification<small>Pop-up with their message; click it to jump to the tab</small></span>
+          <span class="switch"><input type="checkbox" data-setting="notifications"><span></span></span></div>
+        <div class="opt"><span class="lbl">Flash the tab title<small>When the Twitch tab is in the background</small></span>
+          <span class="switch"><input type="checkbox" data-setting="flashTitle"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Highlight</h2>
+        <div class="opt"><span class="lbl">Style</span>
+          <select data-setting="highlightStyle">
+            <option value="both">Background + side bar</option>
+            <option value="bg">Background only</option>
+            <option value="border">Side bar only</option>
+            <option value="none">No highlight</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Strength</span>
+          <input type="range" min="5" max="60" step="1" data-setting="highlightOpacity"><output data-for="highlightOpacity"></output></div>
+        <div class="opt"><span class="lbl">Star next to their name</span>
+          <span class="switch"><input type="checkbox" data-setting="showStar"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Where it runs</h2>
+        <div class="opt col"><span class="lbl">Only these channels<small>Comma separated. Leave blank to watch every channel.</small></span>
+          <textarea data-setting="channels" placeholder="e.g. xqc, kaicenat" spellcheck="false"></textarea></div>
+        <div class="opt"><span class="lbl">Ignore old messages for<small>Seconds after opening a channel, so chat history doesn't beep</small></span>
+          <input type="number" min="0" max="30" step="1" data-setting="backlogSeconds"></div>
+        <div class="opt"><span class="lbl">Activity history</span>
+          <select data-setting="logLimit">
+            <option value="50">50 messages</option>
+            <option value="100">100 messages</option>
+            <option value="200">200 messages</option>
+            <option value="500">500 messages</option>
+          </select></div>
+      </div>
+
+      <div class="group">
+        <h2>Data</h2>
+        <div id="dataFull">
+          <div class="opt"><span class="lbl">Backup<small>Save or load your watchlist and settings</small></span>
+            <button id="exportBtn" class="btn ghost small">Export</button>
+            <button id="importBtn" class="btn ghost small">Import</button>
+            <input id="importFile" type="file" accept=".json,application/json" hidden></div>
+        </div>
+        <div id="dataPopup" class="opt"><span class="lbl">Backup<small>Import and export open in a full tab</small></span>
+          <button id="openFullData" class="btn ghost small">Open</button></div>
+        <div class="opt"><span class="lbl">Reset message counts</span>
+          <button id="resetStats" class="btn danger small">Reset</button></div>
+        <div class="opt"><span class="lbl">Erase everything<small>Watchlist, settings and history</small></span>
+          <button id="resetAll" class="btn danger small">Erase</button></div>
+        <div class="opt"><span class="lbl">Debug logging<small>Writes details to the Twitch tab's console</small></span>
+          <span class="switch"><input type="checkbox" data-setting="debug"><span></span></span></div>
+        <div id="dataMsg" class="hint"></div>
+      </div>
+    </section>
+
+    <!-- STATUS -->
+    <section data-panel="status" hidden>
+      <div id="status" class="list"></div>
+      <div class="status-actions">
+        <button id="testAlert" class="btn primary">Test alert</button>
+        <span id="testMsg" class="muted"></span>
+      </div>
+      <p class="hint">Already had Twitch open when you installed this? Reload that tab once so the watcher can attach to it.</p>
+    </section>
+  </main>
+</div>
+<script src="shared.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
