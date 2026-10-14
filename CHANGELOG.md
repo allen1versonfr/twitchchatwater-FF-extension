@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1
+
+- Security hardening: the add-on now asks only for access to twitch.tv instead of all browser tabs.
+- Badge images shown in the profile card are copied without any page attributes.
+- Release workflow: Mozilla signing keys are only visible to the signing step, actions are pinned to exact versions.
+
 ## 2.1.0
 
 - **Profile card**: click a name or @mention in chat to see that person's recent messages, watch or unwatch them, change their color, or open Twitch's own card. Configurable in Settings (click, Ctrl+click, or off).

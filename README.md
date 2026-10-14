@@ -31,6 +31,11 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 
 <img src="docs/popup.png" alt="Toolbar popup" width="300">
 
+## Privacy
+
+The add-on doesn't send anything anywhere. It reads chat on twitch.tv pages and keeps everything in your browser.
+The only thing that leaves your computer is your watchlist and settings, through Firefox Sync, and only if you're signed in to Firefox with Add-ons sync on (you can turn it off in Settings).
+
 ## If nothing happens
 
 1. Open the **Status** tab. If it says "No Twitch chat detected", reload the Twitch tab.

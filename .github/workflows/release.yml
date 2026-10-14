@@ -17,17 +17,25 @@ on:
 permissions:
   contents: write
 
+# Never run two releases at once.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Only the "Sign with Mozilla" step can see the Mozilla keys; this just records whether they exist.
     env:
       GH_TOKEN: ${{ github.token }}
-      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
-      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      HAS_AMO_KEYS: ${{ secrets.AMO_JWT_ISSUER != '' && secrets.AMO_JWT_SECRET != '' }}
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to exact commits so a hijacked tag can't run code next to the keys.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
 
@@ -64,11 +72,15 @@ jobs:
 
       - name: Sign with Mozilla
         id: sign
-        if: steps.ver.outputs.skip != 'true' && env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != ''
+        if: steps.ver.outputs.skip != 'true' && env.HAS_AMO_KEYS == 'true'
+        env:
+          # web-ext reads these itself, so the keys never appear on a command line
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
         run: |
           npx --yes web-ext@8 sign --source-dir . --artifacts-dir signed --channel unlisted \
             --ignore-files ".github/**" "docs/**" "*.md" \
-            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET" --approval-timeout 900000
+            --approval-timeout 900000
           XPI=$(ls signed/*.xpi | head -n1)
           cp "$XPI" "dist/twitch-chat-watcher-${VERSION}.xpi"
           REPO_URL="https://github.com/${GITHUB_REPOSITORY}"

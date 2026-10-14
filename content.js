@@ -444,11 +444,18 @@
     return [...line.querySelectorAll("img.chat-badge, [data-a-target='chat-badge'] img, .chat-badge img")]
       .slice(0, 6)
       .map((img) => {
-        const c = img.cloneNode(true);
-        c.removeAttribute("class");
+        // copy only the picture itself, never other attributes from the page
+        const c = document.createElement("img");
+        const src = img.getAttribute("src") || "";
+        if (/^https:\/\//i.test(src)) c.src = src;
+        const srcset = img.getAttribute("srcset");
+        if (srcset && /^https:\/\//i.test(srcset.trim())) c.srcset = srcset;
+        c.alt = img.alt || "";
         c.title = img.alt || "";
+        c.referrerPolicy = "no-referrer";
         return c;
-      });
+      })
+      .filter((c) => c.src);
   }
 
   function openTwitchCard() {

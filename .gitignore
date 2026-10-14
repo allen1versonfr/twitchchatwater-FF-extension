@@ -1,0 +1,21 @@
+# build output
+dist/
+signed/
+web-ext-artifacts/
+*.xpi
+*.zip
+
+# never commit keys or local config
+.env
+.env.*
+*.pem
+*.key
+.web-ext-config.*
+web-ext-config.*
+
+# editor / OS clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
