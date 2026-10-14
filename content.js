@@ -70,6 +70,14 @@
   let contextUser = null;
   let audio = null;
 
+  const PAGE_ID = Math.random().toString(36).slice(2, 8); // keeps message ids unique across reloads
+  const MAX_PEOPLE = 1000;
+  const MAX_MSGS = 100;
+  const people = new Map();  // login -> { login, display, first, msgs[], lastLine }
+  const aliases = new Map(); // other name forms (localized display names) -> login
+  let msgCounter = 0;
+  let bypassClick = false;
+
   const debug = (...a) => { if (settings.debug) console.log("[Chat Watcher]", ...a); };
 
   // ---------- settings ----------
@@ -235,7 +243,7 @@
 
   // ---------- processing ----------
 
-  function evaluate(line, author, live) {
+  function evaluate(line, author, live, knownText) {
     clear(line);
     if (!settings.enabled || !channelAllowed()) return;
     const user = matchUser(author);
@@ -243,7 +251,7 @@
     highlight(line, user, author.nameEl);
     if (!live || Date.now() < readyAt) return;
 
-    const text = getText(line, author.display);
+    const text = knownText != null ? knownText : getText(line, author.display);
     const now = Date.now();
     const key = user.login + "|" + text;
     if (now - (recent.get(key) || 0) < 2500) return; // same row re-rendered by Twitch
@@ -253,7 +261,10 @@
     hits++;
     debug("message from watched user", user.login, text);
     browser.runtime
-      .sendMessage({ type: "hit", login: user.login, display: author.display || user.name, channel: currentChannel(), text, time: now })
+      .sendMessage({
+        type: "hit", login: user.login, display: author.display || user.name,
+        channel: currentChannel(), text, time: now, msgId: line.dataset.tcwId || null
+      })
       .then((r) => {
         if (r && r.localSound) playLocal(r.localSound.type, r.localSound.volume);
       })
@@ -274,8 +285,345 @@
     const author = getAuthor(line);
     if (!author.names.length) return;
     lastAuthor = author.display;
-    evaluate(line, author, live);
+    const id = PAGE_ID + "-" + ++msgCounter;
+    line.dataset.tcwId = id;
+    const text = getText(line, author.display);
+    remember(author, line, id, text, live);
+    evaluate(line, author, live, text);
   }
+
+  // ---------- per-person history (this page only, kept in memory) ----------
+
+  function remember(author, line, id, text, live) {
+    const login = author.names[0];
+    let p = people.get(login);
+    if (p) people.delete(login); // keep most recently active at the end
+    else p = { login, display: login, first: Date.now(), msgs: [] };
+    people.set(login, p);
+    if (author.display) p.display = author.display;
+    p.lastLine = new WeakRef(line);
+    for (const n of author.names.slice(1)) aliases.set(n, login);
+    p.msgs.push({ id, text, time: Date.now(), channel: currentChannel(), backlog: !live });
+    if (p.msgs.length > MAX_MSGS) p.msgs.shift();
+    if (people.size > MAX_PEOPLE) people.delete(people.keys().next().value);
+    if (card && card.login === login) scheduleCardRender();
+  }
+
+  function resolveLogin(name) {
+    const n = TCW.normalize(name);
+    return people.has(n) ? n : aliases.get(n) || n;
+  }
+
+  // ---------- jump to message ----------
+
+  function jumpLocal(id) {
+    if (!id) return false;
+    const el = document.querySelector(`[data-tcw-id="${CSS.escape(id)}"]`);
+    if (!el || !el.isConnected) return false;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.remove("tcw-flash");
+    void el.offsetWidth; // restart the animation
+    el.classList.add("tcw-flash");
+    setTimeout(() => el.classList.remove("tcw-flash"), 2400);
+    return true;
+  }
+
+  // ---------- profile card ----------
+
+  const CARD_CSS = `
+    :host { all: initial; }
+    .card {
+      position: fixed; z-index: 2147483646; width: 320px; max-width: calc(100vw - 16px);
+      max-height: min(440px, calc(100vh - 16px)); display: flex; flex-direction: column;
+      background: #18181b; color: #efeff1; border: 1px solid #3a3a3d; border-radius: 10px;
+      box-shadow: 0 10px 34px rgba(0,0,0,.55); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    .head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 4px 12px; cursor: move; user-select: none; }
+    .badges { display: flex; gap: 3px; flex: none; }
+    .badges img { width: 18px; height: 18px; }
+    .name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .login { color: #adadb8; font-size: 12px; white-space: nowrap; }
+    .x { margin-left: auto; }
+    .meta { color: #adadb8; font-size: 12px; padding: 0 12px; }
+    .star { color: var(--c, #ffcc00); font-weight: 700; }
+    .note { margin: 6px 12px 0; padding: 5px 8px; background: #0e0e10; border-radius: 6px; color: #dedee3; font-size: 12px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #2f2f35; align-items: center; }
+    button {
+      font: inherit; font-weight: 600; font-size: 12px; color: #efeff1; background: #2f2f35; border: none;
+      border-radius: 6px; padding: 5px 10px; cursor: pointer;
+    }
+    button:hover { background: #3a3a3d; }
+    button.primary { background: #9147ff; }
+    button.primary:hover { background: #772ce8; }
+    button.icon { background: none; color: #adadb8; padding: 2px 6px; font-size: 14px; }
+    button.icon:hover { color: #fff; background: #2f2f35; }
+    input[type=color] { width: 26px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
+    .hist-head { padding: 8px 12px 4px; color: #adadb8; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+    .hist { overflow-y: auto; padding: 0 6px 8px; flex: 1; min-height: 40px; }
+    .msg { padding: 5px 6px; border-radius: 6px; word-break: break-word; }
+    .msg.live { cursor: pointer; }
+    .msg.live:hover { background: #26262c; }
+    .msg.gone { opacity: .55; }
+    .t { color: #adadb8; font-size: 11px; margin-right: 4px; font-variant-numeric: tabular-nums; }
+    .ch { color: #bf94ff; font-size: 11px; margin-right: 4px; }
+    .empty { color: #adadb8; padding: 14px 6px; text-align: center; }
+  `;
+
+  let card = null; // { login, display, anchor, host, root, box }
+  let cardRaf = 0;
+
+  function closeCard() {
+    if (!card) return;
+    card.host.remove();
+    card = null;
+  }
+
+  function scheduleCardRender() {
+    if (cardRaf) return;
+    cardRaf = requestAnimationFrame(() => {
+      cardRaf = 0;
+      renderCard();
+    });
+  }
+
+  function el(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") e.className = v;
+      else if (k === "style") e.setAttribute("style", v);
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+      else e.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid != null && kid !== false) e.append(kid.nodeType ? kid : String(kid));
+    return e;
+  }
+
+  function clockTime(t) {
+    return new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  async function openCard(login, display, anchor, x, y) {
+    closeCard();
+    const host = el("div", { id: "tcw-card-host" });
+    const root = host.attachShadow({ mode: "open" });
+    root.append(el("style", {}, CARD_CSS));
+    const box = el("div", { class: "card", role: "dialog", "aria-label": "Chat Watcher profile" });
+    root.append(box);
+    (document.body || document.documentElement).append(host);
+    card = { login, display, anchor, host, root, box, log: [] };
+    renderCard();
+    place(x, y);
+    try {
+      const d = await browser.storage.local.get("log");
+      if (card && card.login === login) {
+        card.log = (d.log || []).filter((e) => e.login === login);
+        renderCard();
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function place(x, y) {
+    const r = card.box.getBoundingClientRect();
+    const left = Math.max(8, Math.min(x + 14, window.innerWidth - r.width - 8));
+    const top = Math.max(8, Math.min(y - 24, window.innerHeight - r.height - 8));
+    card.box.style.left = left + "px";
+    card.box.style.top = top + "px";
+  }
+
+  function nameColor(line) {
+    if (!line) return "";
+    const n = line.querySelector(".chat-author__display-name, [data-a-target='chat-message-username'], .seventv-chat-user-username") ||
+      line.querySelector(NAME_SEL);
+    return n ? getComputedStyle(n).color : "";
+  }
+
+  function badgeClones(line) {
+    if (!line) return [];
+    return [...line.querySelectorAll("img.chat-badge, [data-a-target='chat-badge'] img, .chat-badge img")]
+      .slice(0, 6)
+      .map((img) => {
+        const c = img.cloneNode(true);
+        c.removeAttribute("class");
+        c.title = img.alt || "";
+        return c;
+      });
+  }
+
+  function openTwitchCard() {
+    let target = card.anchor && card.anchor.isConnected ? card.anchor : null;
+    if (!target) {
+      const p = people.get(card.login);
+      const line = p && p.lastLine && p.lastLine.deref();
+      target = line && line.isConnected ? line.querySelector(NAME_SEL) : null;
+    }
+    closeCard();
+    if (!target) return toast("Their name isn't in chat right now");
+    bypassClick = true;
+    try { target.click(); } finally { bypassClick = false; }
+  }
+
+  function renderCard() {
+    if (!card) return;
+    const { login, box } = card;
+    const p = people.get(login);
+    const watched = users.get(login);
+    const line = p && p.lastLine ? p.lastLine.deref() : null;
+    const liveLine = line && line.isConnected ? line : null;
+    const display = (p && p.display) || card.display || login;
+    const color = nameColor(liveLine);
+
+    // merge this page's messages with the saved activity log (other channels/tabs)
+    const items = [];
+    const ids = new Set();
+    for (const m of p ? p.msgs : []) {
+      items.push({ ...m, local: true });
+      ids.add(m.id);
+    }
+    for (const e of card.log) {
+      if (e.msgId && ids.has(e.msgId)) continue;
+      items.push({ id: e.msgId, text: e.text, time: e.time, channel: e.channel, target: e });
+    }
+    items.sort((a, b) => b.time - a.time);
+
+    const here = p ? p.msgs.length : 0;
+    const metaBits = [];
+    metaBits.push(here ? `${here} message${here === 1 ? "" : "s"} on this page` : "No messages on this page yet");
+    if (p && here) metaBits.push(`first seen ${TCW.ago(p.first)}`);
+
+    const actions = [];
+    if (watched) {
+      const swatch = el("input", { type: "color", value: watched.color, title: "Highlight color" });
+      swatch.addEventListener("change", () =>
+        browser.runtime.sendMessage({ type: "updateUser", login, patch: { color: swatch.value } }));
+      actions.push(swatch, el("button", {
+        onclick: () => browser.runtime.sendMessage({ type: "removeUser", login })
+      }, "Unwatch"));
+    } else {
+      actions.push(el("button", {
+        class: "primary",
+        onclick: () => browser.runtime.sendMessage({ type: "addUsers", names: [display] })
+      }, "★ Watch"));
+    }
+    actions.push(
+      el("button", { onclick: openTwitchCard, title: "Open Twitch's own card (mod tools, follow, gift)" }, "Twitch card"),
+      el("button", {
+        onclick: () => window.open("https://www.twitch.tv/" + encodeURIComponent(login), "_blank", "noopener")
+      }, "Channel ↗")
+    );
+
+    const hist = el("div", { class: "hist" });
+    if (!items.length) {
+      hist.append(el("div", { class: "empty" }, "Nothing from them since this page opened."));
+    }
+    const chan = currentChannel();
+    for (const m of items) {
+      const inPage = m.local && document.querySelector(`[data-tcw-id="${CSS.escape(m.id)}"]`);
+      const canJump = inPage || (!m.local && m.target);
+      const row = el("div", {
+        class: "msg" + (canJump ? " live" : " gone"),
+        title: inPage ? "Jump to message" : m.local ? "Scrolled out of chat" : m.channel ? `Go to #${m.channel}` : ""
+      },
+        el("span", { class: "t" }, m.backlog ? "earlier" : clockTime(m.time)),
+        m.channel && m.channel !== chan ? el("span", { class: "ch" }, "#" + m.channel) : null,
+        m.text || "—"
+      );
+      if (inPage) row.addEventListener("click", () => jumpLocal(m.id));
+      else if (canJump) row.addEventListener("click", () => {
+        if (!jumpLocal(m.id)) browser.runtime.sendMessage({ type: "jump", target: m.target });
+      });
+      hist.append(row);
+    }
+
+    const keepScroll = box.querySelector(".hist") ? box.querySelector(".hist").scrollTop : 0;
+    box.replaceChildren(
+      el("div", { class: "head" },
+        el("span", { class: "badges" }, badgeClones(liveLine)),
+        el("span", { class: "name", style: color ? `color:${color}` : null, title: display }, display),
+        TCW.normalize(display) !== login ? el("span", { class: "login" }, "(" + login + ")") : null,
+        el("button", { class: "icon x", title: "Close (Esc)", onclick: closeCard }, "✕")
+      ),
+      el("div", { class: "meta" },
+        watched ? el("span", { class: "star", style: `--c:${watched.color}` },
+          `★ Watching · ${watched.hits || 0} total${watched.enabled ? "" : " (paused)"}`) : null,
+        watched ? el("br") : null,
+        metaBits.join(" · ")
+      ),
+      watched && watched.note ? el("div", { class: "note" }, watched.note) : null,
+      el("div", { class: "actions" }, actions),
+      el("div", { class: "hist-head" }, "Recent messages"),
+      hist
+    );
+    hist.scrollTop = keepScroll;
+    enableDrag(box.querySelector(".head"));
+  }
+
+  function enableDrag(handle) {
+    handle.addEventListener("mousedown", (e) => {
+      if (e.button !== 0 || e.target.closest("button")) return;
+      e.preventDefault();
+      const box = card.box;
+      const r = box.getBoundingClientRect();
+      const dx = e.clientX - r.left;
+      const dy = e.clientY - r.top;
+      const move = (ev) => {
+        box.style.left = Math.max(0, Math.min(ev.clientX - dx, window.innerWidth - r.width)) + "px";
+        box.style.top = Math.max(0, Math.min(ev.clientY - dy, window.innerHeight - 40)) + "px";
+      };
+      const up = () => {
+        window.removeEventListener("mousemove", move, true);
+        window.removeEventListener("mouseup", up, true);
+      };
+      window.addEventListener("mousemove", move, true);
+      window.addEventListener("mouseup", up, true);
+    });
+  }
+
+  function findChatRow(node) {
+    const line = node.closest(LINE_SEL);
+    if (line) return line;
+    for (let p = node; p; p = p.parentElement) if (seen.has(p)) return p;
+    return null;
+  }
+
+  function onNameClick(e) {
+    if (bypassClick || settings.cardTrigger === "off" || e.button !== 0) return;
+    const wantMod = settings.cardTrigger === "ctrl";
+    if (wantMod !== (e.ctrlKey || e.metaKey)) return;
+    const t = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
+    if (!t || (card && card.host.contains(t))) return;
+
+    let login = null;
+    let display = null;
+    let anchor = null;
+    const mention = t.closest(".mention-fragment, [data-a-target='chat-message-mention']");
+    if (mention && findChatRow(mention)) {
+      display = mention.textContent.trim().replace(/^@/, "");
+      login = resolveLogin(display);
+      anchor = null;
+    } else {
+      const nameEl = t.closest(NAME_SEL + ", .chat-line__username");
+      if (!nameEl) return;
+      const line = findChatRow(nameEl);
+      if (!line || isSkipped(nameEl, line)) return;
+      const a = getAuthor(line);
+      if (!a.names.length) return;
+      login = a.names[0];
+      display = a.display;
+      anchor = nameEl;
+    }
+    if (!login) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    openCard(login, display, anchor, e.clientX, e.clientY);
+  }
+
+  window.addEventListener("click", onNameClick, true);
+  window.addEventListener("keydown", (e) => { if (e.key === "Escape" && card) closeCard(); }, true);
+  window.addEventListener("mousedown", (e) => {
+    if (card && !e.composedPath().includes(card.host)) closeCard();
+  }, true);
 
   function findLines(node) {
     const parent = node.parentElement;
@@ -379,12 +727,21 @@
     if (!msg) return;
     if (msg.type === "getContextUser") return Promise.resolve(contextUser);
     if (msg.type === "toast") toast(msg.text);
+    if (msg.type === "jump") return Promise.resolve(jumpLocal(msg.msgId));
   });
 
   browser.storage.onChanged.addListener((ch, area) => {
-    if (area !== "local" || !(ch.settings || ch.users)) return;
+    if (area !== "local" || !(ch.settings || ch.users || ch.log)) return;
+    if (card && ch.log) {
+      card.log = (ch.log.newValue || []).filter((e) => e.login === card.login);
+      scheduleCardRender();
+    }
+    if (!(ch.settings || ch.users)) return;
     if (ch.settings) settings = { ...TCW.DEFAULT_SETTINGS, ...(ch.settings.newValue || {}) };
-    if (ch.users) setUsers(ch.users.newValue);
+    if (ch.users) {
+      setUsers(ch.users.newValue);
+      if (card) scheduleCardRender();
+    }
     updateAllow();
     const sig = makeSig();
     if (sig !== signature) {

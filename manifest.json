@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Highlights messages and plays a sound when people on your watchlist chat on Twitch.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -11,7 +11,11 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "twitch-chat-watcher@local",
-      "strict_min_version": "115.0"
+      "strict_min_version": "140.0",
+      "update_url": "https://github.com/allen1versonfr/twitchchatwater-FF-extension/releases/latest/download/updates.json",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
   "background": {

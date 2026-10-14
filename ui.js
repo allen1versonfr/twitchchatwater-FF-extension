@@ -64,6 +64,15 @@ function openChannel(ch) {
   if (isPopup) window.close();
 }
 
+async function jumpTo(e) {
+  try {
+    await send("jump", { target: { tabId: e.tabId, frameId: e.frameId, msgId: e.msgId, channel: e.channel } });
+  } catch (err) {
+    openChannel(e.channel);
+  }
+  if (isPopup) window.close();
+}
+
 function openFull(tab) {
   if (tab) {
     try { localStorage.setItem("tcw-tab", tab); } catch (e) { /* ignore */ }
@@ -250,8 +259,8 @@ function renderActivity() {
     $("#activity").replaceChildren(...entries.map((e) => h("div", {
       class: "card entry",
       style: `--c:${userColor(e.login, e.color)}`,
-      title: e.channel ? `Open #${e.channel}` : "",
-      onclick: () => openChannel(e.channel)
+      title: e.msgId ? "Jump to this message" : e.channel ? `Open #${e.channel}` : "",
+      onclick: () => jumpTo(e)
     },
       h("div", { class: "entry-head" },
         h("b", {}, e.display || e.login),
@@ -275,6 +284,17 @@ function fillSettings() {
   }
   updateOutputs();
   $("#offTag").hidden = state.settings.enabled;
+  renderSync();
+}
+
+function renderSync() {
+  const s = state.syncState;
+  const el = $("#syncStatus");
+  $("#syncNow").disabled = !state.settings.syncEnabled;
+  if (!state.settings.syncEnabled) el.textContent = "Sync is off on this computer";
+  else if (!s) el.textContent = "Waiting for first sync…";
+  else if (!s.ok) el.textContent = "Sync problem: " + (s.error || "unknown error");
+  else el.textContent = `Up to date · ${s.people || 0} ${s.people === 1 ? "person" : "people"} · ${ago(s.time)}`;
 }
 
 function updateOutputs() {
@@ -449,11 +469,12 @@ function applyData(d) {
   if (d.settings !== undefined) state.settings = { ...D, ...(d.settings || {}) };
   if (d.users !== undefined) state.users = (Array.isArray(d.users) ? d.users : []).map((u, i) => TCW.fixUser(u, i)).filter(Boolean);
   if (d.log !== undefined) state.log = Array.isArray(d.log) ? d.log : [];
+  if (d.syncState !== undefined) state.syncState = d.syncState || null;
 }
 
 async function init() {
-  const d = await browser.storage.local.get(["settings", "users", "log"]);
-  applyData({ settings: d.settings || null, users: d.users || [], log: d.log || [] });
+  const d = await browser.storage.local.get(["settings", "users", "log", "syncState"]);
+  applyData({ settings: d.settings || null, users: d.users || [], log: d.log || [], syncState: d.syncState || null });
 
   $("#openFull").hidden = !isPopup;
   $("#openFull").addEventListener("click", () => openFull());
@@ -475,6 +496,7 @@ async function init() {
   $("#filter").addEventListener("input", renderPeople);
   $("#activityUser").addEventListener("change", renderActivity);
   $("#clearLog").addEventListener("click", () => send("clearLog"));
+  $("#syncNow").addEventListener("click", () => send("syncNow"));
 
   bindSettings();
   bindData();
@@ -483,7 +505,7 @@ async function init() {
   browser.storage.onChanged.addListener((ch, area) => {
     if (area !== "local") return;
     const patch = {};
-    for (const k of ["settings", "users", "log"]) if (ch[k]) patch[k] = ch[k].newValue;
+    for (const k of ["settings", "users", "log", "syncState"]) if (ch[k]) patch[k] = ch[k].newValue;
     applyData(patch);
     scheduleRender();
   });

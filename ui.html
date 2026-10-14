@@ -35,7 +35,7 @@
         <span id="peopleCount" class="muted"></span>
       </div>
       <div id="people" class="list"></div>
-      <p class="hint">Tip: right-click any message in Twitch chat and pick <b>Watch this chat user</b>.</p>
+      <p class="hint">Tip: click any name in Twitch chat for their profile card, or right-click a message and pick <b>Watch this chat user</b>.</p>
     </section>
 
     <!-- ACTIVITY -->
@@ -82,6 +82,24 @@
       </div>
 
       <div class="group">
+        <h2>Profile card</h2>
+        <div class="opt"><span class="lbl">Open when you<small>Shows their recent messages, with Watch and jump-to-message</small></span>
+          <select data-setting="cardTrigger">
+            <option value="click">Click a name</option>
+            <option value="ctrl">Ctrl+click a name</option>
+            <option value="off">Never (use Twitch's card)</option>
+          </select></div>
+      </div>
+
+      <div class="group">
+        <h2>Firefox Sync</h2>
+        <div class="opt"><span class="lbl">Sync watchlist and settings<small>Across computers signed in to Firefox with Add-ons sync turned on. Message counts and activity stay on each computer.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="syncEnabled"><span></span></span></div>
+        <div class="opt"><span class="lbl" id="syncStatus">—</span>
+          <button id="syncNow" class="btn ghost small">Sync now</button></div>
+      </div>
+
+      <div class="group">
         <h2>Where it runs</h2>
         <div class="opt col"><span class="lbl">Only these channels<small>Comma separated. Leave blank to watch every channel.</small></span>
           <textarea data-setting="channels" placeholder="e.g. xqc, kaicenat" spellcheck="false"></textarea></div>
@@ -108,7 +126,7 @@
           <button id="openFullData" class="btn ghost small">Open</button></div>
         <div class="opt"><span class="lbl">Reset message counts</span>
           <button id="resetStats" class="btn danger small">Reset</button></div>
-        <div class="opt"><span class="lbl">Erase everything<small>Watchlist, settings and history</small></span>
+        <div class="opt"><span class="lbl">Erase everything<small>Watchlist, settings and history. With sync on, this also clears your other computers.</small></span>
           <button id="resetAll" class="btn danger small">Erase</button></div>
         <div class="opt"><span class="lbl">Debug logging<small>Writes details to the Twitch tab's console</small></span>
           <span class="switch"><input type="checkbox" data-setting="debug"><span></span></span></div>

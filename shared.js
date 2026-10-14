@@ -16,8 +16,14 @@ var TCW = (() => {
     channels: "",              // blank = every channel
     backlogSeconds: 5,
     logLimit: 200,
+    cardTrigger: "click",      // click | ctrl | off  (profile card when clicking a name in chat)
+    syncEnabled: true,         // Firefox Sync for watchlist + settings
     debug: false
   };
+
+  // What travels through Firefox Sync. Message counts and the activity log stay on each computer.
+  const SYNC_USER_FIELDS = ["name", "color", "enabled", "sound", "notify", "note", "added"];
+  const LOCAL_ONLY_SETTINGS = ["syncEnabled", "debug"];
 
   // [frequency, start offset (s), duration (s), waveform]
   const SOUNDS = {
@@ -104,5 +110,20 @@ var TCW = (() => {
     }
   }
 
-  return { DEFAULT_SETTINGS, SOUNDS, PALETTE, normalize, pickColor, newUser, fixUser, playSound };
+  function ago(t) {
+    if (!t) return "";
+    const s = Math.round((Date.now() - t) / 1000);
+    if (s < 10) return "just now";
+    if (s < 60) return s + "s ago";
+    const m = Math.round(s / 60);
+    if (m < 60) return m + "m ago";
+    const hr = Math.round(m / 60);
+    if (hr < 24) return hr + "h ago";
+    return Math.round(hr / 24) + "d ago";
+  }
+
+  return {
+    DEFAULT_SETTINGS, SOUNDS, PALETTE, SYNC_USER_FIELDS, LOCAL_ONLY_SETTINGS,
+    normalize, pickColor, newUser, fixUser, playSound, ago
+  };
 })();

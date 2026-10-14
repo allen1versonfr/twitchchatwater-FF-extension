@@ -16,6 +16,14 @@
   font-weight: 700;
 }
 
+.tcw-flash {
+  animation: tcw-flash 2.2s ease-out;
+}
+@keyframes tcw-flash {
+  0%, 30% { outline: 2px solid #bf94ff; outline-offset: -2px; background-color: rgba(145, 71, 255, 0.35); }
+  100% { outline: 2px solid transparent; outline-offset: -2px; }
+}
+
 .tcw-toast {
   position: fixed;
   right: 20px;
