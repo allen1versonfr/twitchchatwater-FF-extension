@@ -49,5 +49,5 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 
 Signing needs two repository secrets, `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. Get them from
 [addons.mozilla.org → Developer Hub → Manage API Keys](https://addons.mozilla.org/developers/addon/api/key/).
-Without them, the release only gets an unsigned zip. After adding the secrets, use **Actions → Release → Run workflow** with the tag to attach the signed file.
+Without them, the release only gets an unsigned zip. After adding the secrets, use **Actions → Release → Run workflow** to attach the signed file to the current version.
 Signing is "unlisted": Mozilla signs the file, but it isn't listed publicly on addons.mozilla.org.
