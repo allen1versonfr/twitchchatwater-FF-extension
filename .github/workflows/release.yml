@@ -1,19 +1,18 @@
 name: Release
 
-# Push a tag like v2.1.0 to publish a release.
+# Publishes a GitHub release whenever the version in manifest.json changes on main
+# (or when a v* tag is pushed, or when run by hand from the Actions tab).
 # If the AMO_JWT_ISSUER and AMO_JWT_SECRET repository secrets are set, the add-on is signed by
 # Mozilla (unlisted, so it isn't public on addons.mozilla.org) and the signed .xpi is attached —
 # that's the file anyone can install in normal Firefox. Without the secrets, only an unsigned
-# package is attached. After adding the secrets, re-run this workflow to attach the signed file.
+# package is attached. After adding the secrets, run this workflow by hand to attach the signed file.
 
 on:
   push:
+    branches: [main]
+    paths: [manifest.json, .github/workflows/release.yml]
     tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing tag to (re)build, e.g. v2.1.0"
-        required: true
 
 permissions:
   contents: write
@@ -22,40 +21,50 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ github.event.inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
       AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
       AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Check version matches tag
+      - name: Work out version
+        id: ver
         run: |
           VERSION=$(node -p "require('./manifest.json').version")
+          TAG="v$VERSION"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          if [ "v$VERSION" != "$TAG" ]; then
-            echo "::error::manifest.json version ($VERSION) doesn't match tag ($TAG)"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${{ github.ref_name }}" != "$TAG" ]; then
+            echo "::error::manifest.json version ($VERSION) doesn't match tag (${{ github.ref_name }})"
             exit 1
+          fi
+          HAS_XPI=$(gh release view "$TAG" --json assets --jq '[.assets[].name | select(endswith(".xpi"))] | length' 2>/dev/null || echo none)
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ] && [ "$HAS_XPI" != "none" ]; then
+            echo "Release $TAG already exists; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_XPI" != "none" ] && [ "$HAS_XPI" != "0" ]; then
+            echo "Release $TAG already has a signed .xpi; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Lint
+        if: steps.ver.outputs.skip != 'true'
         continue-on-error: true
         run: npx --yes web-ext@8 lint --source-dir . --ignore-files ".github/**" "docs/**" "*.md" --warnings-as-errors=false
 
       - name: Build unsigned package
+        if: steps.ver.outputs.skip != 'true'
         run: |
           npx --yes web-ext@8 build --source-dir . --artifacts-dir dist --overwrite-dest \
             --ignore-files ".github/**" "docs/**" "*.md" --filename "twitch-chat-watcher-${VERSION}-unsigned.zip"
 
       - name: Sign with Mozilla
         id: sign
-        if: env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != ''
+        if: steps.ver.outputs.skip != 'true' && env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != ''
         run: |
           npx --yes web-ext@8 sign --source-dir . --artifacts-dir signed --channel unlisted \
             --ignore-files ".github/**" "docs/**" "*.md" \
@@ -81,6 +90,7 @@ jobs:
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Write release notes
+        if: steps.ver.outputs.skip != 'true'
         run: |
           {
             sed -n "/^## ${VERSION}/,/^## /p" CHANGELOG.md | sed '1d;$d'
@@ -97,10 +107,11 @@ jobs:
           cat notes.md
 
       - name: Publish release
+        if: steps.ver.outputs.skip != 'true'
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --notes-file notes.md --title "Twitch Chat Watcher $TAG"
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "Twitch Chat Watcher $TAG" --notes-file notes.md
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Twitch Chat Watcher $TAG" --notes-file notes.md
           fi

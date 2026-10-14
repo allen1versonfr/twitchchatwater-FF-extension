@@ -43,7 +43,7 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 ## Making a release (maintainers)
 
 1. Bump `version` in `manifest.json` and add a section to `CHANGELOG.md`.
-2. Commit, then tag and push: `git tag v2.1.0 && git push origin v2.1.0`.
+2. Commit and push to `main`. A new version number in `manifest.json` publishes a release automatically.
 3. The **Release** GitHub Action builds the add-on, has Mozilla sign it, and publishes the `.xpi` plus `updates.json`
    (which powers auto-updates) to a GitHub release.
 
