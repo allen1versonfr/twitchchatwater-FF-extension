@@ -42,11 +42,31 @@
 
     <!-- ACTIVITY -->
     <section data-panel="activity" hidden>
-      <div class="list-tools">
-        <select id="activityUser" aria-label="Filter by person"><option value="">Everyone</option></select>
-        <button id="clearLog" class="btn ghost small">Clear</button>
+      <div class="seg view-switch" role="tablist" aria-label="Activity view">
+        <button type="button" role="tab" data-view="messages" aria-selected="true" class="on">Messages</button>
+        <button type="button" role="tab" data-view="watch" aria-selected="false">Watch time</button>
       </div>
-      <div id="activity" class="list"></div>
+      <div data-subview="messages">
+        <div class="list-tools">
+          <select id="activityUser" aria-label="Filter by person"><option value="">Everyone</option></select>
+          <button id="clearLog" class="btn ghost small">Clear</button>
+        </div>
+        <div id="activity" class="list"></div>
+      </div>
+      <div data-subview="watch" hidden>
+        <div id="watchSummary" class="watch-summary"></div>
+        <div class="list-tools">
+          <input id="watchFilter" type="search" placeholder="Search streamers" aria-label="Search streamers">
+          <select id="watchSort" aria-label="Sort by">
+            <option value="total">Most watched</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 days</option>
+            <option value="last">Recently watched</option>
+          </select>
+        </div>
+        <div id="watchList" class="list"></div>
+        <p class="hint">Counted only while a stream is actually playing on its channel page. Stored only on this computer.</p>
+      </div>
     </section>
 
     <!-- PAINTS -->
@@ -143,6 +163,25 @@
       </div>
 
       <div class="group">
+        <h2>Watch time</h2>
+        <div class="opt"><span class="lbl">Track my watch time<small>Per streamer, stored only on this computer (never synced or sent anywhere)</small></span>
+          <span class="switch"><input type="checkbox" data-setting="watchTrack"><span></span></span></div>
+        <div class="opt"><span class="lbl">Show it next to the viewer count<small>On live channel pages</small></span>
+          <span class="switch"><input type="checkbox" data-setting="watchBadge"><span></span></span></div>
+        <div class="opt"><span class="lbl">Only count while the tab is visible<small>Off: a playing stream counts even in a background tab</small></span>
+          <span class="switch"><input type="checkbox" data-setting="watchVisibleOnly"><span></span></span></div>
+        <div id="watchDataFull">
+          <div class="opt"><span class="lbl">Watch-time data<small>Save a copy or merge one back in</small></span>
+            <button id="watchExport" class="btn ghost small">Export</button>
+            <button id="watchImport" class="btn ghost small">Import</button>
+            <input id="watchImportFile" type="file" accept=".json,application/json" hidden></div>
+        </div>
+        <div class="opt"><span class="lbl">Reset watch time<small>Deletes all tracked time</small></span>
+          <button id="watchReset" class="btn danger small">Reset</button></div>
+        <div id="watchMsg" class="hint" role="status"></div>
+      </div>
+
+      <div class="group">
         <h2>Firefox Sync</h2>
         <div class="opt"><span class="lbl">Sync watchlist and settings<small>Across computers signed in to Firefox with Add-ons sync turned on. Message counts and activity stay on each computer.</small></span>
           <span class="switch"><input type="checkbox" data-setting="syncEnabled"><span></span></span></div>
@@ -200,5 +239,6 @@
 <script src="paints.js"></script>
 <script src="ui.js"></script>
 <script src="ui-paints.js"></script>
+<script src="ui-watch.js"></script>
 </body>
 </html>

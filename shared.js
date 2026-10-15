@@ -22,6 +22,9 @@ var TCW = (() => {
     paintsOthers: false,       // opt-in: look up other people's published paints (sends chat usernames to the paint server)
     paintsAnimate: true,       // allow animated paints (reduced-motion always wins)
     paints7tvWins: true,       // leave names that 7TV already painted alone
+    watchTrack: true,          // track your own watch time per streamer (stored only on this computer)
+    watchBadge: true,          // show it next to the live viewer count
+    watchVisibleOnly: false,   // only count while the Twitch tab is visible
     paintServer: "",           // override of TCW_CONFIG.paintServer
     twitchClientId: "",        // override of TCW_CONFIG.twitchClientId
     debug: false
@@ -128,8 +131,27 @@ var TCW = (() => {
     return Math.round(hr / 24) + "d ago";
   }
 
+  // 4521 s -> "1h 15m"; 40 s -> "<1m"
+  function duration(sec) {
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
+    if (sec === 0) return "0m";
+    if (sec < 60) return "<1m";
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    if (d) return `${d}d ${h}h`;
+    if (h) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  // Local calendar day, e.g. "2026-10-15"
+  function dayKey(t) {
+    const d = new Date(t == null ? Date.now() : t);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
   return {
     DEFAULT_SETTINGS, SOUNDS, PALETTE, SYNC_USER_FIELDS, LOCAL_ONLY_SETTINGS,
-    normalize, pickColor, newUser, fixUser, playSound, ago
+    normalize, pickColor, newUser, fixUser, playSound, ago, duration, dayKey
   };
 })();

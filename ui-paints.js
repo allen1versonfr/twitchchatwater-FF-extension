@@ -520,8 +520,9 @@ async function initPaints() {
   await refreshPaintConfig();
 
   $("#newPaint").addEventListener("click", () => openEditor(null, false));
-  $("#exportPaints").addEventListener("click", exportPaints);
-  $("#importPaints").addEventListener("click", () => $("#importPaintsFile").click());
+  // File pickers and downloads close Firefox's toolbar popup, so do those in the full page.
+  $("#exportPaints").addEventListener("click", () => (isPopup ? openFull("paints") : exportPaints()));
+  $("#importPaints").addEventListener("click", () => (isPopup ? openFull("paints") : $("#importPaintsFile").click()));
   $("#importPaintsFile").addEventListener("change", (e) => {
     const f = e.target.files[0];
     e.target.value = "";

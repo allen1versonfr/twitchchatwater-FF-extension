@@ -361,3 +361,18 @@ body.full .previews { grid-template-columns: 1fr 1fr; }
 details.advanced { margin-top: 8px; }
 details.advanced summary { cursor: pointer; color: var(--muted); padding: 6px 0; }
 details.advanced input { width: 100%; }
+
+/* ---------- watch time ---------- */
+.view-switch { margin-bottom: 10px; }
+.watch-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; text-align: center; }
+body.full .stat { background: var(--panel2); }
+.stat-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat-lbl { color: var(--muted); font-size: 11px; }
+.watch-row { cursor: pointer; padding-bottom: 6px; }
+.watch-row:hover, .watch-row:focus-visible { border-color: var(--accent); outline: none; }
+.watch-total { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.watch-bars { display: flex; align-items: flex-end; gap: 3px; height: 18px; padding: 0 10px; }
+.watch-bars .bar { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; }
+.watch-share { margin: 6px 10px 0; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.watch-share span { display: block; height: 100%; background: #bf94ff; }

@@ -132,3 +132,11 @@ html.tcw-paints-still .tcw-paint.tcw-paint-anim { animation: none !important; }
 #tcw-card-host .tcw-c-t { color: #adadb8; font-size: 11px; margin-right: 4px; font-variant-numeric: tabular-nums; }
 #tcw-card-host .tcw-c-ch { color: #bf94ff; font-size: 11px; margin-right: 4px; }
 #tcw-card-host .tcw-c-empty { color: #adadb8; padding: 14px 6px; text-align: center; }
+
+/* ---------- watch time badge (next to the live viewer count) ---------- */
+.tcw-watch {
+  display: inline-flex; align-items: center; margin-left: 8px; padding: 0 7px; border-radius: 9px;
+  font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; font-variant-numeric: tabular-nums;
+  color: #efeff1; background: rgba(145, 71, 255, .3); vertical-align: middle; cursor: default;
+}
+html.tw-root--theme-light .tcw-watch { color: #0e0e10; background: rgba(145, 71, 255, .16); }

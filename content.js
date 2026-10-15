@@ -511,9 +511,15 @@
     const box = el("div", { class: "tcw-c", role: "dialog", "aria-label": "Chat Watcher profile", tabindex: "-1" });
     host.append(box);
     (document.body || document.documentElement).append(host);
-    card = { login, display, anchor, host, box, log: [] };
+    card = { login, display, anchor, host, box, log: [], watch: null };
     renderCard();
     place(x, y);
+    browser.runtime.sendMessage({ type: "watch:get", channel: login }).then((w) => {
+      if (card && card.login === login && w && w.total >= 60) {
+        card.watch = w;
+        scheduleCardRender();
+      }
+    }).catch(() => {});
     try {
       const d = await browser.storage.local.get("log");
       if (card && card.login === login) {
@@ -597,6 +603,7 @@
     const metaBits = [];
     metaBits.push(here ? `${here} message${here === 1 ? "" : "s"} on this page` : "No messages on this page yet");
     if (p && here) metaBits.push(`first seen ${TCW.ago(p.first)}`);
+    if (card.watch) metaBits.push(`you've watched them ${TCW.duration(card.watch.total)}`);
 
     const nameSpan = el("span", { class: "tcw-c-name", title: display }, display);
     const cardPaint = paintFor(login, true);
@@ -806,6 +813,79 @@
 
   // ---------- status + messaging ----------
 
+  // ---------- watch time ----------
+  // Every few seconds: if the main stream video on a channel page is playing, tell the background.
+  // The background does the counting (one clock per channel, even with several tabs open).
+
+  const WATCH_BEAT = (globalThis.TCW_WATCH_TUNING && globalThis.TCW_WATCH_TUNING.beat) || 5000;
+  const VIEWERS_SEL = "[data-a-target='animated-channel-viewers-count'], [data-a-target='channel-viewers-count']";
+  let watchWasPlaying = false;
+
+  function watchChannel() {
+    const parts = location.pathname.split("/").filter(Boolean).map((p) => p.toLowerCase());
+    if (parts.length === 1 && !RESERVED.has(parts[0]) && /^[a-z0-9_]{1,25}$/.test(parts[0])) return parts[0];
+    if (parts[0] === "moderator" && parts.length === 2 && /^[a-z0-9_]{1,25}$/.test(parts[1])) return parts[1];
+    return "";
+  }
+
+  // The stream player is by far the biggest <video> on the page; hover previews are small.
+  function mainVideo() {
+    let best = null;
+    let bestArea = 200 * 110;
+    for (const v of document.querySelectorAll("video")) {
+      const r = v.getBoundingClientRect();
+      const area = r.width * r.height;
+      if (area >= bestArea) { best = v; bestArea = area; }
+    }
+    return best;
+  }
+
+  function channelDisplay(ch) {
+    const el = document.querySelector(".channel-info-content h1, [data-a-target='stream-info-card-component'] h1, h1.tw-title");
+    const t = el ? el.textContent.trim() : "";
+    return TCW.normalize(t) === ch ? t : "";
+  }
+
+  async function watchBeat() {
+    const ch = watchChannel();
+    const v = ch && settings.watchTrack ? mainVideo() : null;
+    const playing = !!v && !v.paused && !v.ended && v.readyState >= 2 && !(settings.watchVisibleOnly && document.hidden);
+    try {
+      if (playing) {
+        await browser.runtime.sendMessage({ type: "watch:beat", channel: ch, live: !!document.querySelector(VIEWERS_SEL), display: channelDisplay(ch) });
+      } else if (watchWasPlaying) {
+        await browser.runtime.sendMessage({ type: "watch:stop" });
+      }
+    } catch (e) { /* background restarting */ }
+    watchWasPlaying = playing;
+    updateWatchBadge(ch);
+  }
+
+  async function updateWatchBadge(ch) {
+    let badge = document.getElementById("tcw-watch-badge");
+    const anchor = ch && settings.watchBadge && settings.watchTrack ? document.querySelector(VIEWERS_SEL) : null;
+    if (!anchor) {
+      if (badge) badge.remove();
+      return;
+    }
+    let info = null;
+    try { info = await browser.runtime.sendMessage({ type: "watch:get", channel: ch }); } catch (e) { /* ignore */ }
+    if (!info) return;
+    if (!badge) badge = el("span", { id: "tcw-watch-badge", class: "tcw-watch" });
+    const name = info.display || ch;
+    badge.textContent = "⏱ " + TCW.duration(info.total);
+    badge.title = `Your watch time on ${name}: ${TCW.duration(info.total)} total, ${TCW.duration(info.today)} today (Chat Watcher)`;
+    badge.setAttribute("aria-label", badge.title);
+    if (anchor.nextElementSibling !== badge) anchor.after(badge);
+  }
+
+  if (IS_TOP) {
+    setInterval(watchBeat, WATCH_BEAT);
+    window.addEventListener("pagehide", () => {
+      if (watchWasPlaying) browser.runtime.sendMessage({ type: "watch:stop" }).catch(() => {});
+    });
+  }
+
   function sendStatus() {
     if (!IS_TOP && !linesSeen) return;
     browser.runtime
@@ -880,6 +960,7 @@
       if (card) scheduleCardRender();
     }
     updateAllow();
+    if (ch.settings && IS_TOP) updateWatchBadge(watchChannel());
     const sig = makeSig();
     if (sig !== signature) {
       signature = sig;

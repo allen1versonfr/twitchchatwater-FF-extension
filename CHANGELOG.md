@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.3.0
+
+- **Watch time**: tracks how long you watch each streamer (only while their stream is actually playing on their channel page)
+  and shows it next to the live viewer count. Activity → Watch time lists every streamer with today / 7 days / all-time
+  totals and a 7-day chart. The profile card shows your watch time on that streamer.
+- Stored only on this computer (never synced or sent anywhere), with daily totals and viewing sessions kept for future features.
+  Export, import (merges without double-counting) and reset in Settings → Watch time.
+- Several tabs on the same stream count once; a sleeping computer doesn't add time; optional "only while the tab is visible".
+- Paint and watch-time import/export open in the full page, because Firefox closes the toolbar popup for file pickers.
+
 ## 2.2.0
 
 - **Nametag paints**: free custom name styles — solid colors, multi-stop and radial gradients, static or animated rainbows,

@@ -601,6 +601,92 @@ async function hidePaint(login, hidden) {
   await browser.storage.local.set({ paintHidden: [...set].slice(0, 2000) });
 }
 
+// ---------- watch time ----------
+// Twitch tabs report "I'm playing channel X" every few seconds. The clock runs here, once per
+// channel, so two tabs on the same stream never count double, and a sleeping computer doesn't
+// add hours (each tick adds at most a few seconds).
+//
+// Stored only in storage.local (never synced), in a format meant to last:
+//   watch = { v: 1, updated, channels: { login: { display, total, liveTotal, first, last, sessions,
+//             days: { "YYYY-MM-DD": seconds } } } }
+//   watchSessions = [ { c: login, s: startMs, e: endMs, live: bool } ]   (newest last, capped)
+
+const WT = Object.assign({ tick: 5000, beatTTL: 15000, maxStep: 15000, flushEvery: 30000, sessionGap: 120000, maxSessions: 5000 },
+  typeof globalThis.TCW_WATCH_TUNING === "object" ? globalThis.TCW_WATCH_TUNING : {});
+const WATCH_LOGIN_RE = /^[a-z0-9_]{1,25}$/;
+const watchBeats = new Map(); // tabId -> { channel, live, display, t }
+const watchOpen = new Map();  // channel -> current session object (also inside watchSessions)
+let watchData = null;
+let watchSessions = null;
+let watchDirty = false;
+let watchLastTick = Date.now();
+let watchLastFlush = Date.now();
+
+function emptyWatch() {
+  return { v: 1, updated: 0, channels: {} };
+}
+
+async function loadWatch() {
+  const d = await browser.storage.local.get(["watch", "watchSessions"]);
+  watchData = d.watch && typeof d.watch === "object" && d.watch.channels ? d.watch : emptyWatch();
+  watchSessions = Array.isArray(d.watchSessions) ? d.watchSessions : [];
+}
+
+function watchTick() {
+  const now = Date.now();
+  const step = Math.min(now - watchLastTick, WT.maxStep);
+  watchLastTick = now;
+  if (!watchData) return;
+  const active = new Map();
+  for (const [tabId, b] of watchBeats) {
+    if (now - b.t > WT.beatTTL) watchBeats.delete(tabId);
+    else if (!active.has(b.channel) || b.live) active.set(b.channel, b);
+  }
+  for (const [ch, s] of watchOpen) if (!active.has(ch) && now - s.e > WT.sessionGap) watchOpen.delete(ch);
+  if (!active.size || step <= 0) return maybeFlushWatch(now);
+
+  const secs = step / 1000;
+  const day = TCW.dayKey(now);
+  for (const [ch, b] of active) {
+    const c = watchData.channels[ch] || (watchData.channels[ch] = { display: ch, total: 0, liveTotal: 0, first: now, last: now, sessions: 0, days: {} });
+    c.total = Math.round((c.total + secs) * 10) / 10;
+    if (b.live) c.liveTotal = Math.round((c.liveTotal + secs) * 10) / 10;
+    c.days[day] = Math.round(((c.days[day] || 0) + secs) * 10) / 10;
+    c.last = now;
+    if (b.display) c.display = b.display;
+    let s = watchOpen.get(ch);
+    if (!s || now - s.e > WT.sessionGap) {
+      s = { c: ch, s: now - step, e: now, live: !!b.live };
+      watchSessions.push(s);
+      if (watchSessions.length > WT.maxSessions) watchSessions.splice(0, watchSessions.length - WT.maxSessions);
+      watchOpen.set(ch, s);
+      c.sessions = (c.sessions || 0) + 1;
+    } else {
+      s.e = now;
+      if (b.live) s.live = true;
+    }
+  }
+  watchData.updated = now;
+  watchDirty = true;
+  maybeFlushWatch(now);
+}
+
+function maybeFlushWatch(now, force) {
+  if (!watchDirty || (!force && now - watchLastFlush < WT.flushEvery)) return Promise.resolve();
+  watchLastFlush = now;
+  watchDirty = false;
+  return serial(() => browser.storage.local.set({ watch: watchData, watchSessions }));
+}
+
+function watchFor(channel) {
+  const c = watchData && watchData.channels[channel];
+  if (!c) return { total: 0, today: 0 };
+  return { total: c.total, today: c.days[TCW.dayKey()] || 0, liveTotal: c.liveTotal, first: c.first, last: c.last, sessions: c.sessions, display: c.display };
+}
+
+setInterval(watchTick, WT.tick);
+browser.tabs.onRemoved.addListener((tabId) => watchBeats.delete(tabId));
+
 // Wraps a promise so errors reach the UI as { error } instead of a rejected message.
 const safe = (p) => p.then((v) => ({ ok: true, value: v }), (e) => ({ ok: false, error: e && e.message ? e.message : String(e) }));
 
@@ -653,6 +739,10 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         unread = 0;
         setBadge();
         await migrate();
+        watchData = emptyWatch();
+        watchSessions = [];
+        watchOpen.clear();
+        watchDirty = false;
         // an erase is deliberate: clear the synced copy too instead of merging it back in
         await browser.storage.local.set({ syncJoined: true });
         await pushSync();
@@ -679,6 +769,55 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return;
     case "getStatus":
       return Promise.resolve(statusList());
+    case "watch:beat": {
+      if (!sender.tab || !WATCH_LOGIN_RE.test(String(msg.channel || ""))) return;
+      return load().then(({ settings }) => {
+        if (!settings.watchTrack) return;
+        const display = typeof msg.display === "string" ? msg.display.trim().slice(0, 40) : "";
+        watchBeats.set(sender.tab.id, { channel: msg.channel, live: !!msg.live, display, t: Date.now() });
+      });
+    }
+    case "watch:stop":
+      if (sender.tab) watchBeats.delete(sender.tab.id);
+      return;
+    case "watch:get":
+      return Promise.resolve(watchFor(String(msg.channel || "").toLowerCase()));
+    case "watch:all":
+      return maybeFlushWatch(Date.now(), true).then(() => ({ data: watchData, sessions: watchSessions }));
+    case "watch:reset":
+      return serial(async () => {
+        watchData = emptyWatch();
+        watchSessions = [];
+        watchOpen.clear();
+        watchDirty = false;
+        await browser.storage.local.set({ watch: watchData, watchSessions });
+      });
+    case "watch:import":
+      return safe(serial(async () => {
+        const d = msg.data;
+        if (!d || typeof d !== "object" || !d.watch || typeof d.watch.channels !== "object") throw new Error("Not a watch-time export file.");
+        let n = 0;
+        for (const [login, c] of Object.entries(d.watch.channels)) {
+          if (!WATCH_LOGIN_RE.test(login) || !c || typeof c !== "object") continue;
+          const cur = watchData.channels[login] || (watchData.channels[login] = { display: login, total: 0, liveTotal: 0, first: Date.now(), last: 0, sessions: 0, days: {} });
+          const num = (v) => (Number.isFinite(v) && v >= 0 && v < 1e9 ? v : 0);
+          for (const [day, sec] of Object.entries(c.days || {})) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+            cur.days[day] = Math.max(cur.days[day] || 0, num(sec)); // max, so importing twice doesn't double
+          }
+          cur.total = Math.max(cur.total, num(c.total), Object.values(cur.days).reduce((a, b) => a + b, 0));
+          cur.liveTotal = Math.max(cur.liveTotal, num(c.liveTotal));
+          if (typeof c.display === "string") cur.display = c.display.slice(0, 40);
+          if (num(c.first)) cur.first = Math.min(cur.first, c.first);
+          cur.last = Math.max(cur.last, num(c.last));
+          n++;
+        }
+        // already inside the storage queue, so write directly (queuing again would wait on itself)
+        watchDirty = false;
+        watchLastFlush = Date.now();
+        await browser.storage.local.set({ watch: watchData, watchSessions });
+        return { channels: n };
+      }));
     case "paints:lookup":
       return lookupPaints(msg.logins);
     case "paints:config":
@@ -757,3 +896,4 @@ browser.menus.onClicked.addListener(async (info, tab) => {
 browser.browserAction.setBadgeBackgroundColor({ color: "#9147ff" });
 serial(migrate);
 serial(startSync);
+serial(loadWatch);

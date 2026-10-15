@@ -28,10 +28,28 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 - **Status tab** showing whether each open Twitch tab's chat is being read, plus a test button.
 - Right-click any chat message, then pick **Watch this chat user**.
 - Backup and restore your watchlist as a file.
+- **Watch time**: how long you've watched each streamer, shown next to the viewer count and in Activity → Watch time.
+  See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
   See [Nametag paints](#nametag-paints).
 
 <img src="docs/popup.png" alt="Toolbar popup" width="300">
+
+## Watch time
+
+<img src="docs/watch-time.png" alt="Watch time view" width="280">
+
+While a stream is playing on a streamer's channel page, the add-on counts the time and shows your total (⏱) next to the
+live viewer count. Hover it for today's time. **Activity → Watch time** lists every streamer you've watched, with today, last 7 days,
+all-time totals and a small 7-day chart. Click a streamer to open their channel.
+
+- Only counts while the video is actually playing (paused, ads-only pages, the directory and VOD/clip pages don't count).
+- Two tabs on the same stream count once. Turn on **Only count while the tab is visible** if you don't want background tabs counted.
+- Everything stays on this computer: it's never synced or sent anywhere. Export, import or reset it in **Settings → Watch time**.
+
+Stored format, for anyone building on it (in `browser.storage.local`):
+`watch = { v: 1, channels: { login: { display, total, liveTotal, first, last, sessions, days: { "YYYY-MM-DD": seconds } } } }`
+and `watchSessions = [ { c: login, s: startMs, e: endMs, live } ]` (last 5,000 sessions).
 
 ## Nametag paints
 
@@ -64,7 +82,7 @@ The add-on reads chat on twitch.tv pages and keeps everything in your browser. T
 - **Publishing a paint**: your Twitch user ID, username and that one paint go to the paint server. Unpublish any time.
 - **Show other people's paints** (off until you turn it on): the usernames you see in chat are sent to the paint server so it can look up their paints. Nothing else is sent: no messages, cookies or account info.
 
-Chat messages and your activity history are never sent anywhere.
+Chat messages, your activity history and your watch time are never sent anywhere.
 
 ## If nothing happens
 
