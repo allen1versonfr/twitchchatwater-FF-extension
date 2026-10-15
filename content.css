@@ -16,6 +16,45 @@
   font-weight: 700;
 }
 
+/* ---------- nametag paints ----------
+   Values come only from CSS custom properties built by paints.js out of validated numbers and #hex colors. */
+.tcw-paint {
+  background-image: var(--tcw-paint-bg) !important;
+  background-size: var(--tcw-paint-size, 100% 100%) !important;
+  background-repeat: repeat !important;
+  background-position: 0% 50%;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: var(--tcw-paint-filter, none);
+}
+.tcw-paint.tcw-paint-s { -webkit-text-stroke: var(--tcw-paint-stroke); }
+.tcw-paint.tcw-paint-w { font-weight: var(--tcw-paint-weight) !important; }
+.tcw-paint.tcw-paint-anim {
+  animation: tcw-paint-slide var(--tcw-paint-dur, 6s) linear infinite;
+  will-change: background-position;
+}
+.tcw-paint.tcw-paint-anim.tcw-paint-rev { animation-direction: reverse; }
+@keyframes tcw-paint-slide {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+.tcw-paint::selection {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: #9147ff;
+}
+/* keep the watchlist star its own color on a painted name */
+.tcw-hit .tcw-paint.tcw-name::before {
+  -webkit-text-fill-color: var(--tcw-color, #ffcc00);
+  color: var(--tcw-color, #ffcc00);
+}
+html.tcw-paints-still .tcw-paint.tcw-paint-anim { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .tcw-paint.tcw-paint-anim { animation: none !important; }
+}
+
 .tcw-flash {
   animation: tcw-flash 2.2s ease-out;
 }
@@ -47,3 +86,49 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ---------- profile card (light DOM; every rule scoped to #tcw-card-host) ---------- */
+#tcw-card-host, #tcw-card-host * {
+  box-sizing: border-box;
+  letter-spacing: normal;
+  text-transform: none;
+  text-shadow: none;
+}
+#tcw-card-host .tcw-c {
+  position: fixed; z-index: 2147483646; width: 320px; max-width: calc(100vw - 16px);
+  max-height: min(440px, calc(100vh - 16px)); display: flex; flex-direction: column;
+  background: #18181b; color: #efeff1; border: 1px solid #3a3a3d; border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .55);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  text-align: left; overflow: hidden; outline: none;
+}
+#tcw-card-host .tcw-c-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 4px 12px; cursor: move; user-select: none; }
+#tcw-card-host .tcw-c-badges { display: flex; gap: 3px; flex: none; }
+#tcw-card-host .tcw-c-badges img { width: 18px; height: 18px; }
+#tcw-card-host .tcw-c-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #efeff1; }
+#tcw-card-host .tcw-c-login { color: #adadb8; font-size: 12px; white-space: nowrap; }
+#tcw-card-host .tcw-c-x { margin-left: auto; }
+#tcw-card-host .tcw-c-meta { color: #adadb8; font-size: 12px; padding: 0 12px; }
+#tcw-card-host .tcw-c-star { color: var(--c, #ffcc00); font-weight: 700; }
+#tcw-card-host .tcw-c-note { margin: 6px 12px 0; padding: 5px 8px; background: #0e0e10; border-radius: 6px; color: #dedee3; font-size: 12px; }
+#tcw-card-host .tcw-c-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #2f2f35; align-items: center; }
+#tcw-card-host .tcw-c-btn {
+  font: 600 12px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #efeff1; background: #2f2f35;
+  border: none; border-radius: 6px; padding: 5px 10px; margin: 0; cursor: pointer; height: auto; min-width: 0;
+}
+#tcw-card-host .tcw-c-btn:hover { background: #3a3a3d; }
+#tcw-card-host .tcw-c-btn:focus-visible { outline: 2px solid #9147ff; outline-offset: 1px; }
+#tcw-card-host .tcw-c-primary { background: #9147ff; }
+#tcw-card-host .tcw-c-primary:hover { background: #772ce8; }
+#tcw-card-host .tcw-c-icon { background: none; color: #adadb8; padding: 2px 6px; font-size: 14px; }
+#tcw-card-host .tcw-c-icon:hover { color: #fff; background: #2f2f35; }
+#tcw-card-host .tcw-c-swatch { width: 26px; height: 24px; border: none; padding: 0; margin: 0; background: none; cursor: pointer; }
+#tcw-card-host .tcw-c-hist-head { padding: 8px 12px 4px; color: #adadb8; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+#tcw-card-host .tcw-c-hist { overflow-y: auto; padding: 0 6px 8px; flex: 1; min-height: 40px; }
+#tcw-card-host .tcw-c-msg { padding: 5px 6px; border-radius: 6px; word-break: break-word; color: #efeff1; }
+#tcw-card-host .tcw-c-live { cursor: pointer; }
+#tcw-card-host .tcw-c-live:hover { background: #26262c; }
+#tcw-card-host .tcw-c-gone { opacity: .55; }
+#tcw-card-host .tcw-c-t { color: #adadb8; font-size: 11px; margin-right: 4px; font-variant-numeric: tabular-nums; }
+#tcw-card-host .tcw-c-ch { color: #bf94ff; font-size: 11px; margin-right: 4px; }
+#tcw-card-host .tcw-c-empty { color: #adadb8; padding: 14px 6px; text-align: center; }

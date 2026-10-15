@@ -18,6 +18,12 @@ var TCW = (() => {
     logLimit: 200,
     cardTrigger: "click",      // click | ctrl | off  (profile card when clicking a name in chat)
     syncEnabled: true,         // Firefox Sync for watchlist + settings
+    paintsOn: true,            // show nametag paints at all
+    paintsOthers: false,       // opt-in: look up other people's published paints (sends chat usernames to the paint server)
+    paintsAnimate: true,       // allow animated paints (reduced-motion always wins)
+    paints7tvWins: true,       // leave names that 7TV already painted alone
+    paintServer: "",           // override of TCW_CONFIG.paintServer
+    twitchClientId: "",        // override of TCW_CONFIG.twitchClientId
     debug: false
   };
 

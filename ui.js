@@ -23,6 +23,7 @@ function h(tag, props, ...kids) {
   for (const [k, v] of Object.entries(props || {})) {
     if (v == null || v === false) continue;
     if (k === "class") el.className = v;
+    else if (k === "style" && typeof v === "object") for (const [prop, val] of Object.entries(v)) el.style.setProperty(prop, val);
     else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v);
     else if (k in el && typeof v !== "string") el[k] = v;
     else if (k === "value") el.value = v;
@@ -154,7 +155,7 @@ function personCard(u) {
     }, open ? "▴" : "▾")
   );
 
-  const card = h("div", { class: "card" + (u.enabled ? "" : " off"), style: `--c:${u.color}` }, row);
+  const card = h("div", { class: "card" + (u.enabled ? "" : " off"), style: { "--c": u.color } }, row);
   if (!open) return card;
 
   const soundSel = h("select", { onchange: (e) => update({ sound: e.target.value }) }, soundOptions(true));
@@ -258,7 +259,7 @@ function renderActivity() {
   } else {
     $("#activity").replaceChildren(...entries.map((e) => h("div", {
       class: "card entry",
-      style: `--c:${userColor(e.login, e.color)}`,
+      style: { "--c": userColor(e.login, e.color) },
       title: e.msgId ? "Jump to this message" : e.channel ? `Open #${e.channel}` : "",
       onclick: () => jumpTo(e)
     },

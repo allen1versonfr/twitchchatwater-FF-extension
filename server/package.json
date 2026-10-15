@@ -1,0 +1,11 @@
+{
+  "name": "tcw-paints",
+  "private": true,
+  "type": "module",
+  "description": "Paint sharing service for Twitch Chat Watcher (Cloudflare Worker + D1)",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "db:init": "wrangler d1 execute tcw-paints --remote --file=schema.sql",
+    "deploy": "wrangler deploy"
+  }
+}

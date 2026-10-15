@@ -1,0 +1,20 @@
+name = "tcw-paints"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Re-check renamed/deleted Twitch accounts once a day.
+[triggers]
+crons = ["17 4 * * *"]
+
+[vars]
+# Public Client ID of your Twitch app (dev.twitch.tv/console). Not a secret.
+TWITCH_CLIENT_ID = "REPLACE_WITH_TWITCH_CLIENT_ID"
+# TWITCH_CLIENT_SECRET is a secret: set it with `npx wrangler secret put TWITCH_CLIENT_SECRET`.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tcw-paints"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[observability]
+enabled = false

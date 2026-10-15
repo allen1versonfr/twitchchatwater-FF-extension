@@ -98,6 +98,7 @@
   function makeSig() {
     return JSON.stringify([
       settings.enabled, settings.highlightStyle, settings.highlightOpacity, settings.showStar, settings.channels,
+      settings.paintsOn, settings.paintsOthers, settings.paintsAnimate, settings.paints7tvWins, settings.paintServer,
       [...users.values()].map((u) => [u.login, u.color, u.enabled])
     ]);
   }
@@ -290,6 +291,8 @@
     const text = getText(line, author.display);
     remember(author, line, id, text, live);
     evaluate(line, author, live, text);
+    lineLogin.set(line, author.names[0]);
+    paintLine(line, author.names[0]);
   }
 
   // ---------- per-person history (this page only, kept in memory) ----------
@@ -328,47 +331,145 @@
     return true;
   }
 
+  // ---------- nametag paints ----------
+  // Own paint comes from the local library (shows even if unpublished — only on your screen).
+  // Everyone else's comes from the background page, which batches and caches server lookups.
+
+  const PAINT_TARGET_SEL = ".chat-author__display-name, [data-a-target='chat-message-username'], .seventv-chat-user-username";
+  const REMOTE_TTL = 15 * 60 * 1000;
+  let paintLib = [];
+  let paintMe = {};
+  let paintHidden = new Set();
+  const remotePaints = new Map(); // login -> { paint|null, t }
+  const paintQueue = new Set();
+  const paintPending = new Set();
+  const lineLogin = new WeakMap(); // chat row -> author login
+  const paintKeys = new WeakMap(); // paint object -> comparison key
+  let paintTimer = 0;
+
+  function cookieLogin() {
+    const m = document.cookie.match(/(?:^|;\s*)login=([a-z0-9_]{1,25})(?:;|$)/i);
+    return m ? m[1].toLowerCase() : "";
+  }
+
+  function selfLogin() {
+    return String(paintMe.login || cookieLogin() || "").toLowerCase();
+  }
+
+  function activePaint() {
+    const id = paintMe.activeId;
+    if (!id) return null;
+    return paintLib.find((p) => p.id === id) || TCWPaint.PRESETS.find((p) => p.id === id) || null;
+  }
+
+  function theme() {
+    return document.documentElement.classList.contains("tw-root--theme-light") ? "light" : "dark";
+  }
+
+  function animateOK() {
+    return settings.paintsAnimate !== false;
+  }
+
+  function paintFor(login, noFetch) {
+    if (!settings.paintsOn || !login || paintHidden.has(login)) return null;
+    if (login === selfLogin()) {
+      const mine = activePaint();
+      if (mine) return mine;
+    }
+    if (!settings.paintsOthers) return null;
+    const r = remotePaints.get(login);
+    if (!noFetch && (!r || Date.now() - r.t > REMOTE_TTL)) queuePaint(login);
+    return r ? r.paint : null;
+  }
+
+  function queuePaint(login) {
+    if (paintPending.has(login)) return;
+    paintQueue.add(login);
+    if (!paintTimer) paintTimer = setTimeout(flushPaints, 400);
+  }
+
+  async function flushPaints() {
+    paintTimer = 0;
+    const logins = [...paintQueue].slice(0, 300);
+    logins.forEach((l) => { paintQueue.delete(l); paintPending.add(l); });
+    if (paintQueue.size) paintTimer = setTimeout(flushPaints, 400);
+    if (!logins.length) return;
+    let res = {};
+    try {
+      res = (await browser.runtime.sendMessage({ type: "paints:lookup", logins })) || {};
+    } catch (e) {
+      debug("paint lookup failed", e);
+    }
+    const now = Date.now();
+    const changed = new Set();
+    for (const l of logins) {
+      paintPending.delete(l);
+      const p = Object.prototype.hasOwnProperty.call(res, l) && res[l] ? TCWPaint.sanitize(res[l]) : null;
+      const before = remotePaints.get(l);
+      remotePaints.set(l, { paint: p, t: now });
+      if ((before && before.paint ? keyOf(before.paint) : "") !== (p ? keyOf(p) : "")) changed.add(l);
+    }
+    if (remotePaints.size > 3000) {
+      for (const k of remotePaints.keys()) {
+        remotePaints.delete(k);
+        if (remotePaints.size <= 2500) break;
+      }
+    }
+    if (changed.size) repaint(changed);
+  }
+
+  function keyOf(paint) {
+    let k = paintKeys.get(paint);
+    if (k === undefined) {
+      k = TCWPaint.key(paint);
+      paintKeys.set(paint, k);
+    }
+    return k;
+  }
+
+  function sevenTvPainted(el) {
+    if (el.classList.contains("tcw-paint")) return false;
+    const bg = getComputedStyle(el).backgroundImage;
+    return !!bg && bg !== "none";
+  }
+
+  function paintLine(line, login) {
+    const target = firstGood(line, PAINT_TARGET_SEL);
+    if (!target) return;
+    const paint = paintFor(login);
+    if (!paint) {
+      if (target.classList.contains("tcw-paint")) {
+        TCWPaint.clear(target);
+        delete target.dataset.tcwPaint;
+      }
+      return;
+    }
+    const k = keyOf(paint) + "|" + theme() + "|" + animateOK();
+    if (target.dataset.tcwPaint === k && target.classList.contains("tcw-paint")) return; // already done
+    if (settings.paints7tvWins && sevenTvPainted(target)) return;
+    TCWPaint.apply(target, paint, { theme: theme(), animate: animateOK() });
+    target.dataset.tcwPaint = k;
+  }
+
+  function repaint(onlyLogins) {
+    for (const line of tracked) {
+      if (!line.isConnected) continue;
+      const login = lineLogin.get(line);
+      if (!login || (onlyLogins && !onlyLogins.has(login))) continue;
+      paintLine(line, login);
+    }
+    if (card && (!onlyLogins || onlyLogins.has(card.login))) scheduleCardRender();
+  }
+
+  function setPaintState(d) {
+    if ("paintLib" in d) paintLib = (Array.isArray(d.paintLib) ? d.paintLib : []).map(TCWPaint.sanitizeEntry).filter(Boolean);
+    if ("paintMe" in d) paintMe = d.paintMe && typeof d.paintMe === "object" ? d.paintMe : {};
+    if ("paintHidden" in d) paintHidden = new Set(Array.isArray(d.paintHidden) ? d.paintHidden : []);
+  }
+
   // ---------- profile card ----------
 
-  const CARD_CSS = `
-    :host { all: initial; }
-    .card {
-      position: fixed; z-index: 2147483646; width: 320px; max-width: calc(100vw - 16px);
-      max-height: min(440px, calc(100vh - 16px)); display: flex; flex-direction: column;
-      background: #18181b; color: #efeff1; border: 1px solid #3a3a3d; border-radius: 10px;
-      box-shadow: 0 10px 34px rgba(0,0,0,.55); font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      overflow: hidden;
-    }
-    .head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 4px 12px; cursor: move; user-select: none; }
-    .badges { display: flex; gap: 3px; flex: none; }
-    .badges img { width: 18px; height: 18px; }
-    .name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .login { color: #adadb8; font-size: 12px; white-space: nowrap; }
-    .x { margin-left: auto; }
-    .meta { color: #adadb8; font-size: 12px; padding: 0 12px; }
-    .star { color: var(--c, #ffcc00); font-weight: 700; }
-    .note { margin: 6px 12px 0; padding: 5px 8px; background: #0e0e10; border-radius: 6px; color: #dedee3; font-size: 12px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #2f2f35; align-items: center; }
-    button {
-      font: inherit; font-weight: 600; font-size: 12px; color: #efeff1; background: #2f2f35; border: none;
-      border-radius: 6px; padding: 5px 10px; cursor: pointer;
-    }
-    button:hover { background: #3a3a3d; }
-    button.primary { background: #9147ff; }
-    button.primary:hover { background: #772ce8; }
-    button.icon { background: none; color: #adadb8; padding: 2px 6px; font-size: 14px; }
-    button.icon:hover { color: #fff; background: #2f2f35; }
-    input[type=color] { width: 26px; height: 24px; border: none; padding: 0; background: none; cursor: pointer; }
-    .hist-head { padding: 8px 12px 4px; color: #adadb8; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-    .hist { overflow-y: auto; padding: 0 6px 8px; flex: 1; min-height: 40px; }
-    .msg { padding: 5px 6px; border-radius: 6px; word-break: break-word; }
-    .msg.live { cursor: pointer; }
-    .msg.live:hover { background: #26262c; }
-    .msg.gone { opacity: .55; }
-    .t { color: #adadb8; font-size: 11px; margin-right: 4px; font-variant-numeric: tabular-nums; }
-    .ch { color: #bf94ff; font-size: 11px; margin-right: 4px; }
-    .empty { color: #adadb8; padding: 14px 6px; text-align: center; }
-  `;
+  // Card styles live in content.css (an extension stylesheet the page can't block).
 
   let card = null; // { login, display, anchor, host, root, box }
   let cardRaf = 0;
@@ -392,7 +493,7 @@
     for (const [k, v] of Object.entries(props || {})) {
       if (v == null || v === false) continue;
       if (k === "class") e.className = v;
-      else if (k === "style") e.setAttribute("style", v);
+      else if (k === "style") for (const [prop, val] of Object.entries(v)) e.style.setProperty(prop, val);
       else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
       else e.setAttribute(k, v === true ? "" : v);
     }
@@ -407,12 +508,10 @@
   async function openCard(login, display, anchor, x, y) {
     closeCard();
     const host = el("div", { id: "tcw-card-host" });
-    const root = host.attachShadow({ mode: "open" });
-    root.append(el("style", {}, CARD_CSS));
-    const box = el("div", { class: "card", role: "dialog", "aria-label": "Chat Watcher profile" });
-    root.append(box);
+    const box = el("div", { class: "tcw-c", role: "dialog", "aria-label": "Chat Watcher profile", tabindex: "-1" });
+    host.append(box);
     (document.body || document.documentElement).append(host);
-    card = { login, display, anchor, host, root, box, log: [] };
+    card = { login, display, anchor, host, box, log: [] };
     renderCard();
     place(x, y);
     try {
@@ -499,41 +598,56 @@
     metaBits.push(here ? `${here} message${here === 1 ? "" : "s"} on this page` : "No messages on this page yet");
     if (p && here) metaBits.push(`first seen ${TCW.ago(p.first)}`);
 
+    const nameSpan = el("span", { class: "tcw-c-name", title: display }, display);
+    const cardPaint = paintFor(login, true);
+    if (cardPaint) TCWPaint.apply(nameSpan, cardPaint, { theme: "dark", animate: animateOK() });
+    else if (color) nameSpan.style.color = color;
+
     const actions = [];
     if (watched) {
-      const swatch = el("input", { type: "color", value: watched.color, title: "Highlight color" });
+      const swatch = el("input", { type: "color", class: "tcw-c-swatch", value: watched.color, title: "Highlight color", "aria-label": "Highlight color" });
       swatch.addEventListener("change", () =>
         browser.runtime.sendMessage({ type: "updateUser", login, patch: { color: swatch.value } }));
       actions.push(swatch, el("button", {
+        class: "tcw-c-btn",
         onclick: () => browser.runtime.sendMessage({ type: "removeUser", login })
       }, "Unwatch"));
     } else {
       actions.push(el("button", {
-        class: "primary",
+        class: "tcw-c-btn tcw-c-primary",
         onclick: () => browser.runtime.sendMessage({ type: "addUsers", names: [display] })
       }, "★ Watch"));
     }
+    if (cardPaint || paintHidden.has(login)) {
+      const hidden = paintHidden.has(login);
+      actions.push(el("button", {
+        class: "tcw-c-btn",
+        title: hidden ? "Show this person's nametag paint again" : "Stop showing this person's nametag paint",
+        onclick: () => browser.runtime.sendMessage({ type: "paints:hide", login, hidden: !hidden })
+      }, hidden ? "Show paint" : "Hide paint"));
+    }
     actions.push(
-      el("button", { onclick: openTwitchCard, title: "Open Twitch's own card (mod tools, follow, gift)" }, "Twitch card"),
+      el("button", { class: "tcw-c-btn", onclick: openTwitchCard, title: "Open Twitch's own card (mod tools, follow, gift)" }, "Twitch card"),
       el("button", {
+        class: "tcw-c-btn",
         onclick: () => window.open("https://www.twitch.tv/" + encodeURIComponent(login), "_blank", "noopener")
       }, "Channel ↗")
     );
 
-    const hist = el("div", { class: "hist" });
+    const hist = el("div", { class: "tcw-c-hist" });
     if (!items.length) {
-      hist.append(el("div", { class: "empty" }, "Nothing from them since this page opened."));
+      hist.append(el("div", { class: "tcw-c-empty" }, "Nothing from them since this page opened."));
     }
     const chan = currentChannel();
     for (const m of items) {
       const inPage = m.local && document.querySelector(`[data-tcw-id="${CSS.escape(m.id)}"]`);
       const canJump = inPage || (!m.local && m.target);
       const row = el("div", {
-        class: "msg" + (canJump ? " live" : " gone"),
+        class: "tcw-c-msg" + (canJump ? " tcw-c-live" : " tcw-c-gone"),
         title: inPage ? "Jump to message" : m.local ? "Scrolled out of chat" : m.channel ? `Go to #${m.channel}` : ""
       },
-        el("span", { class: "t" }, m.backlog ? "earlier" : clockTime(m.time)),
-        m.channel && m.channel !== chan ? el("span", { class: "ch" }, "#" + m.channel) : null,
+        el("span", { class: "tcw-c-t" }, m.backlog ? "earlier" : clockTime(m.time)),
+        m.channel && m.channel !== chan ? el("span", { class: "tcw-c-ch" }, "#" + m.channel) : null,
         m.text || "—"
       );
       if (inPage) row.addEventListener("click", () => jumpLocal(m.id));
@@ -543,27 +657,27 @@
       hist.append(row);
     }
 
-    const keepScroll = box.querySelector(".hist") ? box.querySelector(".hist").scrollTop : 0;
+    const keepScroll = box.querySelector(".tcw-c-hist") ? box.querySelector(".tcw-c-hist").scrollTop : 0;
     box.replaceChildren(
-      el("div", { class: "head" },
-        el("span", { class: "badges" }, badgeClones(liveLine)),
-        el("span", { class: "name", style: color ? `color:${color}` : null, title: display }, display),
-        TCW.normalize(display) !== login ? el("span", { class: "login" }, "(" + login + ")") : null,
-        el("button", { class: "icon x", title: "Close (Esc)", onclick: closeCard }, "✕")
+      el("div", { class: "tcw-c-head" },
+        el("span", { class: "tcw-c-badges" }, badgeClones(liveLine)),
+        nameSpan,
+        TCW.normalize(display) !== login ? el("span", { class: "tcw-c-login" }, "(" + login + ")") : null,
+        el("button", { class: "tcw-c-btn tcw-c-icon tcw-c-x", title: "Close (Esc)", "aria-label": "Close", onclick: closeCard }, "✕")
       ),
-      el("div", { class: "meta" },
-        watched ? el("span", { class: "star", style: `--c:${watched.color}` },
+      el("div", { class: "tcw-c-meta" },
+        watched ? el("span", { class: "tcw-c-star", style: { "--c": watched.color } },
           `★ Watching · ${watched.hits || 0} total${watched.enabled ? "" : " (paused)"}`) : null,
         watched ? el("br") : null,
         metaBits.join(" · ")
       ),
-      watched && watched.note ? el("div", { class: "note" }, watched.note) : null,
-      el("div", { class: "actions" }, actions),
-      el("div", { class: "hist-head" }, "Recent messages"),
+      watched && watched.note ? el("div", { class: "tcw-c-note" }, watched.note) : null,
+      el("div", { class: "tcw-c-actions" }, actions),
+      el("div", { class: "tcw-c-hist-head" }, "Recent messages"),
       hist
     );
     hist.scrollTop = keepScroll;
-    enableDrag(box.querySelector(".head"));
+    enableDrag(box.querySelector(".tcw-c-head"));
   }
 
   function enableDrag(handle) {
@@ -666,7 +780,12 @@
         tracked.delete(line);
         continue;
       }
-      evaluate(line, getAuthor(line), false);
+      const author = getAuthor(line);
+      evaluate(line, author, false);
+      if (author.names.length) {
+        lineLogin.set(line, author.names[0]);
+        paintLine(line, author.names[0]);
+      }
     }
     scanAll();
   }
@@ -738,13 +857,24 @@
   });
 
   browser.storage.onChanged.addListener((ch, area) => {
-    if (area !== "local" || !(ch.settings || ch.users || ch.log)) return;
+    if (area !== "local") return;
+    if (ch.paintLib || ch.paintMe || ch.paintHidden) {
+      const d = {};
+      for (const k of ["paintLib", "paintMe", "paintHidden"]) if (ch[k]) d[k] = ch[k].newValue;
+      setPaintState(d);
+      repaint(null);
+    }
+    if (!(ch.settings || ch.users || ch.log)) return;
     if (card && ch.log) {
       card.log = (ch.log.newValue || []).filter((e) => e.login === card.login);
       scheduleCardRender();
     }
     if (!(ch.settings || ch.users)) return;
-    if (ch.settings) settings = { ...TCW.DEFAULT_SETTINGS, ...(ch.settings.newValue || {}) };
+    if (ch.settings) {
+      const before = settings.paintServer;
+      settings = { ...TCW.DEFAULT_SETTINGS, ...(ch.settings.newValue || {}) };
+      if (settings.paintServer !== before) remotePaints.clear();
+    }
     if (ch.users) {
       setUsers(ch.users.newValue);
       if (card) scheduleCardRender();
@@ -757,9 +887,10 @@
     }
   });
 
-  browser.storage.local.get(["settings", "users"]).then((d) => {
+  browser.storage.local.get(["settings", "users", "paintLib", "paintMe", "paintHidden"]).then((d) => {
     settings = { ...TCW.DEFAULT_SETTINGS, ...(d.settings || {}) };
     setUsers(d.users);
+    setPaintState({ paintLib: d.paintLib, paintMe: d.paintMe, paintHidden: d.paintHidden });
     updateAllow();
     signature = makeSig();
     readyAt = Date.now() + settings.backlogSeconds * 1000;

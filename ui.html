@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Twitch Chat Watcher</title>
+<link rel="stylesheet" href="content.css">
 <link rel="stylesheet" href="ui.css">
 </head>
 <body>
@@ -18,6 +19,7 @@
   <nav class="tabs">
     <button data-tab="people">People</button>
     <button data-tab="activity">Activity <span id="activityPill" class="pill" hidden></span></button>
+    <button data-tab="paints">Paints</button>
     <button data-tab="settings">Settings</button>
     <button data-tab="status">Status</button>
   </nav>
@@ -45,6 +47,30 @@
         <button id="clearLog" class="btn ghost small">Clear</button>
       </div>
       <div id="activity" class="list"></div>
+    </section>
+
+    <!-- PAINTS -->
+    <section data-panel="paints" hidden>
+      <div id="paintGallery">
+        <div id="paintMe" class="card me-card" aria-live="polite"></div>
+        <div id="paintOptIn" class="notice" hidden>
+          <div><b>See other people's paints?</b>
+            <small>This sends the usernames you see in chat to the paint server so it can look up their paints. Nothing else is sent.</small></div>
+          <button id="paintOptInBtn" class="btn primary small">Turn on</button>
+        </div>
+        <div class="list-tools">
+          <button id="newPaint" class="btn primary small">New paint</button>
+          <button id="importPaints" class="btn ghost small">Import</button>
+          <button id="exportPaints" class="btn ghost small">Export</button>
+          <input id="importPaintsFile" type="file" accept=".json,application/json" hidden>
+        </div>
+        <div id="paintMsg" class="hint" role="status"></div>
+        <h2 class="sub">Your paints</h2>
+        <div id="myPaints" class="gallery"></div>
+        <h2 class="sub">Presets</h2>
+        <div id="presetPaints" class="gallery"></div>
+      </div>
+      <div id="paintEditor" hidden></div>
     </section>
 
     <!-- SETTINGS -->
@@ -89,6 +115,31 @@
             <option value="ctrl">Ctrl+click a name</option>
             <option value="off">Never (use Twitch's card)</option>
           </select></div>
+      </div>
+
+      <div class="group">
+        <h2>Nametag paints</h2>
+        <div class="opt"><span class="lbl">Show nametag paints<small>Yours and other people's</small></span>
+          <span class="switch"><input type="checkbox" data-setting="paintsOn"><span></span></span></div>
+        <div class="opt"><span class="lbl">Show other people's paints<small>Sends the usernames you see in chat to the paint server to look them up</small></span>
+          <span class="switch"><input type="checkbox" data-setting="paintsOthers"><span></span></span></div>
+        <div class="opt"><span class="lbl">Animate paints<small>Your system's reduce-motion setting always turns animation off</small></span>
+          <span class="switch"><input type="checkbox" data-setting="paintsAnimate"><span></span></span></div>
+        <div class="opt"><span class="lbl">Let 7TV paints show instead<small>Don't paint over names that 7TV already painted</small></span>
+          <span class="switch"><input type="checkbox" data-setting="paints7tvWins"><span></span></span></div>
+        <div class="opt"><span class="lbl" id="hiddenPaintsLbl">Hidden paints</span>
+          <button id="clearHiddenPaints" class="btn ghost small">Show all</button></div>
+        <div class="opt"><span class="lbl">Delete my paints<small>Removes your saved paints on this computer (not a published one)</small></span>
+          <button id="resetPaints" class="btn danger small">Delete</button></div>
+        <details class="advanced">
+          <summary>Advanced: paint server</summary>
+          <div class="opt col"><span class="lbl">Paint server URL<small>Leave blank to use this version's default</small></span>
+            <input type="text" data-setting="paintServer" placeholder="https://…" spellcheck="false"></div>
+          <div class="opt col"><span class="lbl">Twitch app Client ID<small>Leave blank to use this version's default</small></span>
+            <input type="text" data-setting="twitchClientId" spellcheck="false"></div>
+          <div class="opt col"><span class="lbl">Sign-in redirect URL<small>Add this as the OAuth Redirect URL of the Twitch app</small></span>
+            <input type="text" id="redirectUrl" readonly></div>
+        </details>
       </div>
 
       <div class="group">
@@ -146,6 +197,8 @@
   </main>
 </div>
 <script src="shared.js"></script>
+<script src="paints.js"></script>
 <script src="ui.js"></script>
+<script src="ui-paints.js"></script>
 </body>
 </html>

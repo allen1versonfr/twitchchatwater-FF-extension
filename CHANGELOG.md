@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.0
+
+- **Nametag paints**: free custom name styles — solid colors, multi-stop and radial gradients, static or animated rainbows,
+  glow/shadow, outline and weight — with a live Twitch-style preview, 12 presets, favorites, import/export.
+- **Share paints**: publish your paint (verified with Twitch sign-in) so other Chat Watcher users see it. Needs the paint
+  server in `server/` to be deployed. Viewers opt in to seeing others' paints.
+- Hide any one person's paint from their profile card; turn animation or paints off; reduced-motion respected;
+  7TV-painted names left alone by default.
+- Profile card now uses the extension's own stylesheet, so it renders even on pages with strict style policies.
+
 ## 2.1.1
 
 - Security hardening: the add-on now asks only for access to twitch.tv instead of all browser tabs.

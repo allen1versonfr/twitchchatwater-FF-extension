@@ -215,6 +215,11 @@ async function setSettings(patch) {
   for (const k of Object.keys(TCW.DEFAULT_SETTINGS)) if (patch && k in patch) next[k] = patch[k];
   await browser.storage.local.set({ settings: next });
   if (!next.enabled) setBadge();
+  if (patch && ("paintServer" in patch || "paintsOthers" in patch)) {
+    paintCache.clear();
+    paintBackoffUntil = 0;
+    paintFails = 0;
+  }
   if (patch && "syncEnabled" in patch) {
     if (next.syncEnabled && !settings.syncEnabled) {
       // turning sync back on: merge with what's in sync instead of overwriting it
@@ -350,6 +355,255 @@ async function jumpTo(target) {
   return { ok: false };
 }
 
+// ---------- nametag paints ----------
+// Library, active paint and hidden list live in storage.local. Other people's published paints are
+// looked up from the paint server in batches (never per message) and cached here for every tab.
+
+const PAINT_LOGIN_RE = /^[a-z0-9_]{1,25}$/;
+const PAINT_HIT_TTL = 15 * 60 * 1000;
+const PAINT_MISS_TTL = 30 * 60 * 1000;
+const PAINT_ERR_TTL = 2 * 60 * 1000;
+const PAINT_CACHE_MAX = 5000;
+const paintCache = new Map(); // login -> { paint|null, exp }
+const paintInflight = new Map(); // login -> Promise
+let paintChain = Promise.resolve();
+let paintLastFetch = 0;
+let paintFails = 0;
+let paintBackoffUntil = 0;
+let paintFetchCount = 0;
+
+function paintConfig(settings) {
+  const cfg = typeof TCW_CONFIG !== "undefined" ? TCW_CONFIG : {};
+  let server = String(settings.paintServer || cfg.paintServer || "").trim().replace(/\/+$/, "");
+  if (!/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(server) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(server)) server = "";
+  let clientId = String(settings.twitchClientId || cfg.twitchClientId || "").trim();
+  if (!/^[a-z0-9]{10,64}$/i.test(clientId)) clientId = "";
+  let redirectUrl = "";
+  try { redirectUrl = browser.identity.getRedirectURL(); } catch (e) { /* identity unavailable */ }
+  return { server, clientId, redirectUrl, canPublish: !!(server && clientId) };
+}
+
+function setPaintCache(login, paint, ttl) {
+  paintCache.delete(login);
+  paintCache.set(login, { paint: paint || null, exp: Date.now() + ttl });
+  if (paintCache.size > PAINT_CACHE_MAX) paintCache.delete(paintCache.keys().next().value);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchPaintBatch(server, logins) {
+  const wait = paintLastFetch + 1000 - Date.now(); // at most one request per second
+  if (wait > 0) await sleep(wait);
+  paintLastFetch = Date.now();
+  paintFetchCount++;
+  const r = await fetch(server + "/v1/paints?logins=" + logins.map(encodeURIComponent).join(","), {
+    credentials: "omit",
+    referrerPolicy: "no-referrer"
+  });
+  if (!r.ok) throw new Error("paint server " + r.status);
+  const data = await r.json();
+  const paints = data && typeof data.paints === "object" && data.paints ? data.paints : {};
+  for (const l of logins) {
+    const rec = Object.prototype.hasOwnProperty.call(paints, l) ? paints[l] : null;
+    const p = rec ? TCWPaint.sanitize(rec.paint) : null;
+    setPaintCache(l, p, p ? PAINT_HIT_TTL : PAINT_MISS_TTL);
+  }
+  paintFails = 0;
+}
+
+async function lookupPaints(logins) {
+  const { settings } = await load();
+  const cfg = paintConfig(settings);
+  const list = [...new Set((logins || []).map((l) => String(l).toLowerCase()))].filter((l) => PAINT_LOGIN_RE.test(l)).slice(0, 300);
+  const out = {};
+  const need = [];
+  const now = Date.now();
+  for (const l of list) {
+    const c = paintCache.get(l);
+    if (c && c.exp > now) out[l] = c.paint;
+    else need.push(l);
+  }
+  if (!need.length || !settings.paintsOn || !settings.paintsOthers || !cfg.server || now < paintBackoffUntil) return out;
+
+  const missing = need.filter((l) => !paintInflight.has(l));
+  for (let i = 0; i < missing.length; i += 100) {
+    const batch = missing.slice(i, i + 100);
+    const job = (paintChain = paintChain.then(() => fetchPaintBatch(cfg.server, batch)).catch(() => {
+      paintFails++;
+      paintBackoffUntil = Date.now() + Math.min(10 * 60 * 1000, 15000 * 2 ** (paintFails - 1));
+      batch.forEach((l) => setPaintCache(l, null, PAINT_ERR_TTL));
+    }));
+    batch.forEach((l) => paintInflight.set(l, job));
+    job.finally(() => batch.forEach((l) => paintInflight.delete(l)));
+  }
+  await Promise.all([...new Set(need.map((l) => paintInflight.get(l)).filter(Boolean))]);
+  for (const l of need) {
+    const c = paintCache.get(l);
+    out[l] = c ? c.paint : null;
+  }
+  return out;
+}
+
+async function loadPaintState() {
+  const d = await browser.storage.local.get(["paintLib", "paintMe", "paintHidden", "paintRecent"]);
+  return {
+    lib: (Array.isArray(d.paintLib) ? d.paintLib : []).map(TCWPaint.sanitizeEntry).filter(Boolean),
+    me: d.paintMe && typeof d.paintMe === "object" ? d.paintMe : { activeId: null, login: "", userId: "", published: null },
+    hidden: Array.isArray(d.paintHidden) ? d.paintHidden.filter((l) => PAINT_LOGIN_RE.test(l)) : [],
+    recent: Array.isArray(d.paintRecent) ? d.paintRecent.map(TCWPaint.hex).filter(Boolean) : []
+  };
+}
+
+function findPaint(lib, id) {
+  return lib.find((p) => p.id === id) || TCWPaint.PRESETS.find((p) => p.id === id) || null;
+}
+
+async function savePaintEntry(entry) {
+  const clean = TCWPaint.sanitizeEntry({ ...entry, updated: Date.now() });
+  if (!clean) throw new Error("That paint isn't valid.");
+  if (clean.id.startsWith("preset-")) clean.id = TCWPaint.newId(); // presets are read-only; save a copy
+  const st = await loadPaintState();
+  const i = st.lib.findIndex((p) => p.id === clean.id);
+  if (i >= 0) st.lib[i] = clean;
+  else st.lib.unshift(clean);
+  if (st.lib.length > 200) throw new Error("You can keep up to 200 paints.");
+  const recent = [...new Set(clean.colors.map((c) => c.c).concat(st.recent))].slice(0, 12);
+  await browser.storage.local.set({ paintLib: st.lib, paintRecent: recent });
+  return clean;
+}
+
+async function deletePaintEntry(id) {
+  const st = await loadPaintState();
+  const lib = st.lib.filter((p) => p.id !== id);
+  const patch = { paintLib: lib };
+  if (st.me.activeId === id) patch.paintMe = { ...st.me, activeId: null };
+  await browser.storage.local.set(patch);
+}
+
+async function setActivePaint(id) {
+  const st = await loadPaintState();
+  if (id && !findPaint(st.lib, id)) throw new Error("That paint doesn't exist any more.");
+  await browser.storage.local.set({ paintMe: { ...st.me, activeId: id || null } });
+}
+
+async function importPaints(data) {
+  if (!data || typeof data !== "object" || !Array.isArray(data.paints)) throw new Error("Not a paint export file.");
+  const st = await loadPaintState();
+  let added = 0;
+  for (const raw of data.paints.slice(0, 200)) {
+    const e = TCWPaint.sanitizeEntry({ ...raw, id: undefined }); // always new ids, never overwrite
+    if (!e) continue;
+    st.lib.push(e);
+    added++;
+  }
+  if (st.lib.length > 200) st.lib.length = 200;
+  await browser.storage.local.set({ paintLib: st.lib });
+  return { added, skipped: data.paints.length - added };
+}
+
+async function twitchSignIn(cfg) {
+  if (!cfg.clientId) throw new Error("Sharing isn't set up in this version yet.");
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const state = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const url = new URL("https://id.twitch.tv/oauth2/authorize");
+  url.search = new URLSearchParams({
+    response_type: "token",
+    client_id: cfg.clientId,
+    redirect_uri: cfg.redirectUrl,
+    scope: "",
+    state
+  }).toString();
+  let result;
+  try {
+    result = await browser.identity.launchWebAuthFlow({ url: url.href, interactive: true });
+  } catch (e) {
+    throw new Error("Twitch sign-in was closed before it finished.");
+  }
+  const frag = new URLSearchParams(new URL(result).hash.slice(1));
+  if (frag.get("error")) throw new Error(frag.get("error_description") || "Twitch sign-in was cancelled.");
+  if (frag.get("state") !== state) throw new Error("Twitch sign-in didn't match. Try again.");
+  const token = frag.get("access_token");
+  if (!token) throw new Error("Twitch didn't return a sign-in.");
+  return token;
+}
+
+async function paintServerCall(cfg, method, body) {
+  const token = await twitchSignIn(cfg);
+  let r;
+  try {
+    r = await fetch(cfg.server + "/v1/me/paint", {
+      method,
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+      credentials: "omit",
+      referrerPolicy: "no-referrer"
+    });
+  } catch (e) {
+    throw new Error("Couldn't reach the paint server. Check your connection and try again.");
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof data.error === "string" ? data.error.slice(0, 200) : `Paint server error (${r.status}).`);
+  return data;
+}
+
+async function setPaintMe(patch) {
+  const st = await loadPaintState();
+  const me = { ...st.me, ...patch };
+  await browser.storage.local.set({ paintMe: me });
+  return me;
+}
+
+async function publishPaint() {
+  const { settings } = await load();
+  const cfg = paintConfig(settings);
+  if (!cfg.canPublish) throw new Error("Sharing isn't set up in this version yet.");
+  const st = await loadPaintState();
+  const entry = findPaint(st.lib, st.me.activeId);
+  if (!entry) throw new Error("Choose a paint to use first.");
+  const paint = TCWPaint.sanitize(entry);
+  await setPaintMe({ busy: true, lastError: "" });
+  try {
+    const data = await paintServerCall(cfg, "PUT", { paint });
+    const saved = TCWPaint.sanitize(data.paint) || paint;
+    setPaintCache(String(data.login), saved, PAINT_HIT_TTL);
+    return await setPaintMe({
+      busy: false, login: String(data.login), userId: String(data.user_id),
+      published: { key: TCWPaint.key(saved), at: data.updated, name: entry.name }
+    });
+  } catch (e) {
+    await setPaintMe({ busy: false, lastError: e.message });
+    throw e;
+  }
+}
+
+async function unpublishPaint() {
+  const { settings } = await load();
+  const cfg = paintConfig(settings);
+  if (!cfg.canPublish) throw new Error("Sharing isn't set up in this version yet.");
+  await setPaintMe({ busy: true, lastError: "" });
+  try {
+    const data = await paintServerCall(cfg, "DELETE");
+    setPaintCache(String(data.login), null, PAINT_MISS_TTL);
+    return await setPaintMe({ busy: false, login: String(data.login), userId: String(data.user_id), published: null });
+  } catch (e) {
+    await setPaintMe({ busy: false, lastError: e.message });
+    throw e;
+  }
+}
+
+async function hidePaint(login, hidden) {
+  login = String(login || "").toLowerCase();
+  if (!PAINT_LOGIN_RE.test(login)) return;
+  const st = await loadPaintState();
+  const set = new Set(st.hidden);
+  if (hidden) set.add(login);
+  else set.delete(login);
+  await browser.storage.local.set({ paintHidden: [...set].slice(0, 2000) });
+}
+
+// Wraps a promise so errors reach the UI as { error } instead of a rejected message.
+const safe = (p) => p.then((v) => ({ ok: true, value: v }), (e) => ({ ok: false, error: e && e.message ? e.message : String(e) }));
+
 // ---------- status of open Twitch tabs ----------
 
 function statusList() {
@@ -425,6 +679,34 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return;
     case "getStatus":
       return Promise.resolve(statusList());
+    case "paints:lookup":
+      return lookupPaints(msg.logins);
+    case "paints:config":
+      return load().then(({ settings }) => ({ ...paintConfig(settings), fetches: paintFetchCount, cached: paintCache.size }));
+    case "paints:save":
+      return safe(serial(() => savePaintEntry(msg.entry)));
+    case "paints:delete":
+      return safe(serial(() => deletePaintEntry(msg.id)));
+    case "paints:setActive":
+      return safe(serial(() => setActivePaint(msg.id)));
+    case "paints:import":
+      return safe(serial(() => importPaints(msg.data)));
+    case "paints:hide":
+      return safe(serial(() => hidePaint(msg.login, msg.hidden)));
+    case "paints:reset":
+      return safe(serial(async () => {
+        const st = await loadPaintState();
+        await browser.storage.local.set({ paintLib: [], paintRecent: [], paintHidden: [], paintMe: { ...st.me, activeId: null } });
+      }));
+    case "paints:publish":
+      return safe(publishPaint());
+    case "paints:unpublish":
+      return safe(unpublishPaint());
+    case "paints:clearCache":
+      paintCache.clear();
+      paintBackoffUntil = 0;
+      paintFails = 0;
+      return Promise.resolve(true);
     case "clearBadge":
       unread = 0;
       setBadge();

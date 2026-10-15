@@ -28,13 +28,43 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 - **Status tab** showing whether each open Twitch tab's chat is being read, plus a test button.
 - Right-click any chat message, then pick **Watch this chat user**.
 - Backup and restore your watchlist as a file.
+- **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
+  See [Nametag paints](#nametag-paints).
 
 <img src="docs/popup.png" alt="Toolbar popup" width="300">
 
+## Nametag paints
+
+<img src="docs/paints.png" alt="Paints tab" width="280"> <img src="docs/paint-editor.png" alt="Paint editor" width="280">
+
+Open the **Paints** tab. Pick a preset or press **New paint**, adjust colors and effects while watching the live preview,
+then **Save & use**. Your name in chat changes right away, but only on your screen.
+
+To let others see it, press **Publish**. A Twitch window asks you to confirm it's your account (no permissions are requested).
+After that, anyone using Chat Watcher with **Show other people's paints** turned on sees your paint, usually within a few minutes.
+
+| Who | What they see |
+|---|---|
+| You | Your active paint on your own name, published or not. |
+| Other Chat Watcher users | Your paint, once you publish it and if they turned on "Show other people's paints". |
+| People without Chat Watcher | Your normal Twitch color. Paints aren't part of Twitch. |
+| 7TV users (without Chat Watcher) | Your normal color or their 7TV paint. 7TV only shows paints it hands out itself, so it can't show these. |
+
+Viewers can hide any one person's paint from that person's profile card, turn off animation, or turn paints off entirely
+(Settings → Nametag paints). Names that 7TV already painted are left alone unless you change that.
+
+Sharing needs the paint server in `server/` to be deployed. See [server/README.md](server/README.md).
+Until then, paints only show on your own screen.
+
 ## Privacy
 
-The add-on doesn't send anything anywhere. It reads chat on twitch.tv pages and keeps everything in your browser.
-The only thing that leaves your computer is your watchlist and settings, through Firefox Sync, and only if you're signed in to Firefox with Add-ons sync on (you can turn it off in Settings).
+The add-on reads chat on twitch.tv pages and keeps everything in your browser. Things leave your computer only in these cases:
+
+- **Firefox Sync** (if you're signed in to Firefox with Add-ons sync on): your watchlist and settings. You can turn it off in Settings.
+- **Publishing a paint**: your Twitch user ID, username and that one paint go to the paint server. Unpublish any time.
+- **Show other people's paints** (off until you turn it on): the usernames you see in chat are sent to the paint server so it can look up their paints. Nothing else is sent: no messages, cookies or account info.
+
+Chat messages and your activity history are never sent anywhere.
 
 ## If nothing happens
 
