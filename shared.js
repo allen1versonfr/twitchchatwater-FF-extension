@@ -26,6 +26,8 @@ var TCW = (() => {
     mentionSound: "chime",
     mentionNotify: false,      // desktop notification for mentions/replies
     mentionName: "",           // your Twitch username; blank = detect from twitch.tv
+    chattersBadge: true,       // show active chatters next to the viewer count
+    chattersWindow: 10,        // minutes; 0 = since you opened the channel
     watchTrack: true,          // track your own watch time per streamer (stored only on this computer)
     watchBadge: true,          // show it next to the live viewer count
     watchVisibleOnly: false,   // only count while the Twitch tab is visible

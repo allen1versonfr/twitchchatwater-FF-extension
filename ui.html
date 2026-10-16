@@ -176,6 +176,20 @@
       </div>
 
       <div class="group">
+        <h2>Active chatters</h2>
+        <div class="opt"><span class="lbl">Show active chatters next to the viewer count<small>People who sent a message. Twitch doesn't show who's connected to chat, only who talks.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="chattersBadge"><span></span></span></div>
+        <div class="opt"><span class="lbl">Count people who chatted in the last</span>
+          <select data-setting="chattersWindow">
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">hour</option>
+            <option value="0">since I opened the channel</option>
+          </select></div>
+      </div>
+
+      <div class="group">
         <h2>Watch time</h2>
         <div class="opt"><span class="lbl">Track my watch time<small>Per streamer, stored only on this computer (never synced or sent anywhere)</small></span>
           <span class="switch"><input type="checkbox" data-setting="watchTrack"><span></span></span></div>

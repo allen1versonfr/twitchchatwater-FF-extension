@@ -30,6 +30,8 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 - Backup and restore your watchlist as a file.
 - **Mention & reply alerts**: a sound (and optional desktop notification) when someone @mentions you or replies to you.
   Your Twitch name is detected automatically; change the sound or turn it off in Settings → Mentions & replies to you.
+- **Active chatters** (💬) next to the viewer count: different people who chatted in the last 10 minutes (adjustable).
+  Twitch doesn't show who's connected to chat, so this counts people who actually talked.
 - **Watch time**: how long you've watched each streamer, shown next to the viewer count and in Activity → Watch time.
   See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.5.0
+
+- **Active chatters** next to the viewer count (💬): how many different people chatted in the last 10 minutes
+  (or 5 / 30 / 60 minutes, or since you opened the channel). Hover for both numbers. Twitch doesn't show who's
+  connected to chat, so this counts people who actually sent a message in the chat your tab shows.
+- Fix: dropdown settings that hold numbers (Activity history size, chatter window) were saved incorrectly;
+  changing Activity history could clear the Activity log.
+
 ## 2.4.0
 
 - **Mention & reply alerts**: a sound (Chime by default, your choice) when someone @mentions you or replies to you in chat,

@@ -140,3 +140,5 @@ html.tcw-paints-still .tcw-paint.tcw-paint-anim { animation: none !important; }
   color: #efeff1; background: rgba(145, 71, 255, .3); vertical-align: middle; cursor: default;
 }
 html.tw-root--theme-light .tcw-watch { color: #0e0e10; background: rgba(145, 71, 255, .16); }
+.tcw-watch.tcw-chatters { background: rgba(0, 173, 3, .25); }
+html.tw-root--theme-light .tcw-watch.tcw-chatters { background: rgba(0, 173, 3, .15); }

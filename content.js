@@ -294,6 +294,54 @@
     lineLogin.set(line, author.names[0]);
     paintLine(line, author.names[0]);
     checkMention(line, author, live, text);
+    noteChatter(author.names[0]);
+  }
+
+  // ---------- active chatters (counted from the chat this tab shows) ----------
+  // Twitch doesn't expose who is connected to a chat (only moderators can get that list), so this counts
+  // the different people who actually sent a message.
+
+  let chatters = new Map(); // login -> last message time
+  let chattersChannel = "";
+  let chattersSince = Date.now();
+
+  function noteChatter(login) {
+    const ch = currentChannel();
+    if (!login || !ch) return;
+    if (ch !== chattersChannel) {
+      chatters = new Map();
+      chattersChannel = ch;
+      chattersSince = Date.now();
+    }
+    chatters.set(login, Date.now());
+    if (chatters.size > 50000) chatters.delete(chatters.keys().next().value);
+  }
+
+  function chatterCounts() {
+    const win = Number(settings.chattersWindow) || 0;
+    const cutoff = win ? Date.now() - win * 60000 : 0;
+    let active = 0;
+    for (const t of chatters.values()) if (t >= cutoff) active++;
+    return { active, total: chatters.size, win };
+  }
+
+  function updateChattersBadge(ch) {
+    let badge = document.getElementById("tcw-chatters-badge");
+    const anchor = ch && settings.chattersBadge ? document.querySelector(VIEWERS_SEL) : null;
+    if (!anchor || ch !== chattersChannel) {
+      if (badge) badge.remove();
+      return;
+    }
+    const c = chatterCounts();
+    if (!badge) badge = el("span", { id: "tcw-chatters-badge", class: "tcw-watch tcw-chatters" });
+    const fmt = (n) => n.toLocaleString();
+    const opened = TCW.ago(chattersSince).replace(" ago", "");
+    badge.textContent = "💬 " + fmt(c.active);
+    badge.title = c.win
+      ? `${fmt(c.active)} people chatted in the last ${c.win} min · ${fmt(c.total)} since you opened this channel (${opened} ago). Counted by Chat Watcher from this chat.`
+      : `${fmt(c.total)} people chatted since you opened this channel (${opened} ago). Counted by Chat Watcher from this chat.`;
+    badge.setAttribute("aria-label", badge.title);
+    if (anchor.nextElementSibling !== badge) anchor.after(badge);
   }
 
   // ---------- mentions & replies to you ----------
@@ -906,6 +954,7 @@
       }
     } catch (e) { /* background restarting */ }
     watchWasPlaying = playing;
+    updateChattersBadge(currentChannel());
     updateWatchBadge(ch);
   }
 
@@ -924,7 +973,9 @@
     badge.textContent = "⏱ " + TCW.duration(info.total);
     badge.title = `Your watch time on ${name}: ${TCW.duration(info.total)} total, ${TCW.duration(info.today)} today (Chat Watcher)`;
     badge.setAttribute("aria-label", badge.title);
-    if (anchor.nextElementSibling !== badge) anchor.after(badge);
+    const after = document.getElementById("tcw-chatters-badge");
+    const ref = after && after.previousElementSibling === anchor ? after : anchor;
+    if (ref.nextElementSibling !== badge) ref.after(badge);
   }
 
   if (IS_TOP) {
@@ -1008,7 +1059,10 @@
       if (card) scheduleCardRender();
     }
     updateAllow();
-    if (ch.settings && IS_TOP) updateWatchBadge(watchChannel());
+    if (ch.settings && IS_TOP) {
+      updateChattersBadge(currentChannel());
+      updateWatchBadge(watchChannel());
+    }
     const sig = makeSig();
     if (sig !== signature) {
       signature = sig;

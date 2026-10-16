@@ -323,8 +323,9 @@ function readSetting(el) {
   if (el.type === "range" || el.type === "number" || typeof D[key] === "number") {
     let v = Number(el.value);
     if (!Number.isFinite(v)) v = D[key];
-    if (el.min !== "") v = Math.max(Number(el.min), v);
-    if (el.max !== "") v = Math.min(Number(el.max), v);
+    // <select> has no min/max; only clamp real number/range inputs
+    if (typeof el.min === "string" && el.min !== "") v = Math.max(Number(el.min), v);
+    if (typeof el.max === "string" && el.max !== "") v = Math.min(Number(el.max), v);
     return v;
   }
   return el.value;

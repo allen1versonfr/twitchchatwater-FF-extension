@@ -14,6 +14,11 @@ function serial(fn) {
   return run;
 }
 
+function logCap(settings) {
+  const n = Number(settings.logLimit);
+  return Number.isFinite(n) && n >= 10 ? Math.min(n, 1000) : 200;
+}
+
 async function load() {
   const d = await browser.storage.local.get(["settings", "users", "log"]);
   return {
@@ -309,7 +314,7 @@ async function onHit(msg, sender) {
   user.hits = (user.hits || 0) + 1;
   user.lastSeen = { time: now, channel, text };
   log.unshift({ login: user.login, display, channel, text, time: now, color: user.color, ...target });
-  if (log.length > settings.logLimit) log.length = settings.logLimit;
+  if (log.length > logCap(settings)) log.length = logCap(settings);
   await browser.storage.local.set({ users, log });
 
   unread++;
@@ -351,7 +356,7 @@ async function onMention(msg, sender) {
     channel
   };
   log.unshift({ kind, login, display, channel, text, time: now, color: "#ff5f5f", ...target });
-  if (log.length > settings.logLimit) log.length = settings.logLimit;
+  if (log.length > logCap(settings)) log.length = logCap(settings);
   await browser.storage.local.set({ log });
   unread++;
   setBadge();
