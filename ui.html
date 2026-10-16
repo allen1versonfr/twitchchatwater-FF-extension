@@ -113,6 +113,19 @@
       </div>
 
       <div class="group">
+        <h2>Mentions &amp; replies to you</h2>
+        <div class="opt"><span class="lbl">Alert when someone @mentions or replies to you<small id="mentionWho"></small></span>
+          <span class="switch"><input type="checkbox" data-setting="mentionAlert"><span></span></span></div>
+        <div class="opt"><span class="lbl">Sound</span>
+          <select data-setting="mentionSound" id="mentionSound"></select>
+          <button id="previewMention" class="icon-btn" title="Preview">▶</button></div>
+        <div class="opt"><span class="lbl">Desktop notification<small>Pop-up with their message; click it to jump to it</small></span>
+          <span class="switch"><input type="checkbox" data-setting="mentionNotify"><span></span></span></div>
+        <div class="opt col"><span class="lbl">Your Twitch username<small>Leave blank to detect it automatically</small></span>
+          <input type="text" data-setting="mentionName" spellcheck="false" autocomplete="off"></div>
+      </div>
+
+      <div class="group">
         <h2>Highlight</h2>
         <div class="opt"><span class="lbl">Style</span>
           <select data-setting="highlightStyle">

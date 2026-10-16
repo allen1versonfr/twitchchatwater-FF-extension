@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.0
+
+- **Mention & reply alerts**: a sound (Chime by default, your choice) when someone @mentions you or replies to you in chat,
+  plus an optional desktop notification. They show in Activity with an "@ you" / "replied to you" tag and can be filtered.
+- Your Twitch username is detected automatically from twitch.tv (or type it in Settings → Mentions & replies to you).
+- Doesn't fire for your own messages, chat history, look-alike names (@alison ≠ @ali), or replies to other people;
+  a burst of pings plays one sound.
+
 ## 2.3.0
 
 - **Watch time**: tracks how long you watch each streamer (only while their stream is actually playing on their channel page)

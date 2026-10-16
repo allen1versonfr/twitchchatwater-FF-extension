@@ -241,30 +241,35 @@ function renderActivity() {
   const sel = $("#activityUser");
   const keep = sel.value;
   const logins = [...new Set(state.log.map((e) => e.login))];
-  sel.replaceChildren(
+  const hasPings = state.log.some((e) => e.kind);
+  sel.replaceChildren(...[
     h("option", { value: "" }, "Everyone"),
+    hasPings ? h("option", { value: "__pings" }, "Mentions & replies to me") : null,
+    hasPings ? h("option", { value: "__watch" }, "Watchlist only") : null,
     ...logins.map((l) => {
       const e = state.log.find((x) => x.login === l);
       return h("option", { value: l }, e.display || l);
     })
-  );
-  sel.value = logins.includes(keep) ? keep : "";
+  ].filter(Boolean));
+  sel.value = logins.includes(keep) || (hasPings && (keep === "__pings" || keep === "__watch")) ? keep : "";
 
-  const entries = state.log.filter((e) => !sel.value || e.login === sel.value);
+  const entries = state.log.filter((e) =>
+    !sel.value || (sel.value === "__pings" ? !!e.kind : sel.value === "__watch" ? !e.kind : e.login === sel.value));
   if (!entries.length) {
     $("#activity").replaceChildren(h("div", { class: "empty" },
       h("div", { class: "empty-title" }, "No activity yet"),
-      h("div", {}, "Messages from people on your watchlist will show up here.")
+      h("div", {}, "Messages from people on your watchlist, and anyone who @mentions or replies to you, show up here.")
     ));
   } else {
     $("#activity").replaceChildren(...entries.map((e) => h("div", {
-      class: "card entry",
-      style: { "--c": userColor(e.login, e.color) },
+      class: "card entry" + (e.kind ? " ping" : ""),
+      style: { "--c": e.kind ? "#ff5f5f" : userColor(e.login, e.color) },
       title: e.msgId ? "Jump to this message" : e.channel ? `Open #${e.channel}` : "",
       onclick: () => jumpTo(e)
     },
       h("div", { class: "entry-head" },
         h("b", {}, e.display || e.login),
+        e.kind ? h("span", { class: "ping-tag" }, e.kind === "reply" ? "replied to you" : "@ you") : null,
         e.channel ? h("span", { class: "chan" }, "#" + e.channel) : null,
         h("span", { class: "time" }, ago(e.time))
       ),
@@ -286,6 +291,12 @@ function fillSettings() {
   updateOutputs();
   $("#offTag").hidden = state.settings.enabled;
   renderSync();
+  const nameInput = $("[data-setting='mentionName']");
+  if (nameInput) {
+    nameInput.placeholder = state.twitchSelf ? `Detected: ${state.twitchSelf}` : "Not detected yet — sign in on twitch.tv or type it";
+    const who = TCW.normalize(state.settings.mentionName) || state.twitchSelf;
+    $("#mentionWho").textContent = who ? `Alerts for @${who}` : "Open twitch.tv while signed in, or type your username";
+  }
 }
 
 function renderSync() {
@@ -321,6 +332,8 @@ function readSetting(el) {
 
 function bindSettings() {
   $("#soundType").replaceChildren(...soundOptions(false));
+  $("#mentionSound").replaceChildren(...soundOptions(false), h("option", { value: "none" }, "Silent"));
+  $("#previewMention").addEventListener("click", () => playLocal(state.settings.mentionSound, state.settings.volume));
   for (const el of $$("[data-setting]")) {
     if (el.type === "range") el.addEventListener("input", updateOutputs);
     el.addEventListener("change", () => {
@@ -332,6 +345,7 @@ function bindSettings() {
       $("#offTag").hidden = state.settings.enabled;
       send("setSettings", { patch: { [key]: v } });
       if (key === "soundType" || key === "volume") playLocal(state.settings.soundType, state.settings.volume);
+      if (key === "mentionSound") playLocal(state.settings.mentionSound, state.settings.volume);
     });
   }
   $("#previewSound").addEventListener("click", () => playLocal(state.settings.soundType, state.settings.volume));
@@ -471,11 +485,12 @@ function applyData(d) {
   if (d.users !== undefined) state.users = (Array.isArray(d.users) ? d.users : []).map((u, i) => TCW.fixUser(u, i)).filter(Boolean);
   if (d.log !== undefined) state.log = Array.isArray(d.log) ? d.log : [];
   if (d.syncState !== undefined) state.syncState = d.syncState || null;
+  if (d.twitchSelf !== undefined) state.twitchSelf = typeof d.twitchSelf === "string" ? d.twitchSelf : "";
 }
 
 async function init() {
-  const d = await browser.storage.local.get(["settings", "users", "log", "syncState"]);
-  applyData({ settings: d.settings || null, users: d.users || [], log: d.log || [], syncState: d.syncState || null });
+  const d = await browser.storage.local.get(["settings", "users", "log", "syncState", "twitchSelf"]);
+  applyData({ settings: d.settings || null, users: d.users || [], log: d.log || [], syncState: d.syncState || null, twitchSelf: d.twitchSelf || "" });
 
   $("#openFull").hidden = !isPopup;
   $("#openFull").addEventListener("click", () => openFull());
@@ -506,7 +521,7 @@ async function init() {
   browser.storage.onChanged.addListener((ch, area) => {
     if (area !== "local") return;
     const patch = {};
-    for (const k of ["settings", "users", "log", "syncState"]) if (ch[k]) patch[k] = ch[k].newValue;
+    for (const k of ["settings", "users", "log", "syncState", "twitchSelf"]) if (ch[k]) patch[k] = ch[k].newValue;
     applyData(patch);
     scheduleRender();
   });

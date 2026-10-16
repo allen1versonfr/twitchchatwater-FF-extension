@@ -22,6 +22,10 @@ var TCW = (() => {
     paintsOthers: false,       // opt-in: look up other people's published paints (sends chat usernames to the paint server)
     paintsAnimate: true,       // allow animated paints (reduced-motion always wins)
     paints7tvWins: true,       // leave names that 7TV already painted alone
+    mentionAlert: true,        // sound when someone @mentions you or replies to you
+    mentionSound: "chime",
+    mentionNotify: false,      // desktop notification for mentions/replies
+    mentionName: "",           // your Twitch username; blank = detect from twitch.tv
     watchTrack: true,          // track your own watch time per streamer (stored only on this computer)
     watchBadge: true,          // show it next to the live viewer count
     watchVisibleOnly: false,   // only count while the Twitch tab is visible

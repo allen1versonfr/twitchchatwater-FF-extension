@@ -330,6 +330,47 @@ async function onHit(msg, sender) {
   return result;
 }
 
+// ---------- mentions & replies to you ----------
+
+let lastMentionSound = 0;
+
+async function onMention(msg, sender) {
+  const { settings, log } = await load();
+  if (!settings.enabled || !settings.mentionAlert) return {};
+  const kind = msg.kind === "reply" ? "reply" : "mention";
+  const login = TCW.normalize(msg.login);
+  if (!/^[a-z0-9_]{1,25}$/.test(login)) return {};
+  const now = Date.now();
+  const text = String(msg.text || "").slice(0, 300);
+  const channel = String(msg.channel || "");
+  const display = String(msg.display || login).slice(0, 40);
+  const target = {
+    tabId: sender.tab ? sender.tab.id : null,
+    frameId: sender.frameId || 0,
+    msgId: msg.msgId ? String(msg.msgId) : null,
+    channel
+  };
+  log.unshift({ kind, login, display, channel, text, time: now, color: "#ff5f5f", ...target });
+  if (log.length > settings.logLimit) log.length = settings.logLimit;
+  await browser.storage.local.set({ log });
+  unread++;
+  setBadge();
+
+  const result = {};
+  if (now - lastMentionSound >= 1500) { // a burst of pings plays one sound
+    lastMentionSound = now;
+    if (settings.sound && settings.mentionSound !== "none") {
+      const ok = await playHere(settings.mentionSound, settings.volume);
+      if (!ok) result.localSound = { type: settings.mentionSound, volume: settings.volume };
+    }
+    if (settings.mentionNotify) {
+      const where = channel ? ` in #${channel}` : "";
+      notify(kind === "reply" ? `${display} replied to you${where}` : `${display} mentioned you${where}`, text || " ", target);
+    }
+  }
+  return result;
+}
+
 // ---------- jump to a message ----------
 
 async function jumpTo(target) {
@@ -714,6 +755,8 @@ browser.runtime.onMessage.addListener((msg, sender) => {
   switch (msg.type) {
     case "hit":
       return serial(() => onHit(msg, sender));
+    case "mention":
+      return serial(() => onMention(msg, sender));
     case "addUsers":
       return serial(() => addUsers(msg.names));
     case "updateUser":

@@ -215,14 +215,14 @@
 
   let baseTitle = null;
   let flashTimer = null;
-  function flashTitle(name) {
+  function flashTitle(name, text) {
     if (!settings.flashTitle || !IS_TOP || !document.hidden) return;
     if (baseTitle === null) baseTitle = document.title;
     let on = false;
     clearInterval(flashTimer);
     flashTimer = setInterval(() => {
       on = !on;
-      document.title = on ? `★ ${name} is chatting` : baseTitle;
+      document.title = on ? (text || `★ ${name} is chatting`) : baseTitle;
     }, 1000);
   }
   document.addEventListener("visibilitychange", () => {
@@ -293,6 +293,54 @@
     evaluate(line, author, live, text);
     lineLogin.set(line, author.names[0]);
     paintLine(line, author.names[0]);
+    checkMention(line, author, live, text);
+  }
+
+  // ---------- mentions & replies to you ----------
+
+  const REPLY_SEL = "[data-test-selector*='reply' i], [data-a-target*='reply' i], [class*='reply-header' i], [class*='replyheader' i]";
+  const MENTION_SEL = ".mention-fragment, [data-a-target='chat-message-mention']";
+
+  function myLogin() {
+    return TCW.normalize(settings.mentionName) || cookieLogin() || TCW.normalize(paintMe.login);
+  }
+
+  function mentionKind(line, me, text) {
+    const header = line.querySelector(REPLY_SEL);
+    if (header) {
+      const m = header.textContent.match(/@([a-z0-9_]{1,25})/i);
+      if (m && m[1].toLowerCase() === me) return "reply";
+    }
+    for (const f of line.querySelectorAll(MENTION_SEL)) {
+      if (!header || !header.contains(f)) {
+        if (TCW.normalize(f.textContent) === me) return "mention";
+      }
+    }
+    const esc = me.replace(/[^a-z0-9_]/g, "");
+    if (esc && new RegExp(`(^|[^a-z0-9_])@${esc}(?![a-z0-9_])`, "i").test(text || "")) return "mention";
+    return null;
+  }
+
+  function checkMention(line, author, live, text) {
+    if (!live || Date.now() < readyAt || !settings.enabled || !settings.mentionAlert) return;
+    const me = myLogin();
+    if (!me || author.names.includes(me)) return; // your own messages never alert you
+    const kind = mentionKind(line, me, text);
+    if (!kind) return;
+    const now = Date.now();
+    const key = "m|" + author.names[0] + "|" + text;
+    if (now - (recent.get(key) || 0) < 2500) return; // same row re-rendered
+    recent.set(key, now);
+    const display = author.display || author.names[0];
+    browser.runtime.sendMessage({
+      type: "mention", kind, login: author.names[0], display,
+      channel: currentChannel(), text, msgId: line.dataset.tcwId || null
+    }).then((r) => {
+      if (r && r.localSound) playLocal(r.localSound.type, r.localSound.volume);
+    }).catch(() => {
+      if (settings.sound && settings.mentionSound !== "none") playLocal(settings.mentionSound, settings.volume);
+    });
+    flashTitle(display, kind === "reply" ? `↩ ${display} replied to you` : `@ ${display} mentioned you`);
   }
 
   // ---------- per-person history (this page only, kept in memory) ----------
@@ -972,6 +1020,12 @@
     settings = { ...TCW.DEFAULT_SETTINGS, ...(d.settings || {}) };
     setUsers(d.users);
     setPaintState({ paintLib: d.paintLib, paintMe: d.paintMe, paintHidden: d.paintHidden });
+    const detected = cookieLogin();
+    if (IS_TOP && detected) {
+      browser.storage.local.get("twitchSelf").then((x) => {
+        if (x.twitchSelf !== detected) browser.storage.local.set({ twitchSelf: detected });
+      }).catch(() => {});
+    }
     updateAllow();
     signature = makeSig();
     readyAt = Date.now() + settings.backlogSeconds * 1000;
