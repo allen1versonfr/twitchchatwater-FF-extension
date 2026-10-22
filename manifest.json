@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools and auto-claim for Twitch chat.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -19,7 +19,7 @@
     }
   },
   "background": {
-    "scripts": ["config.js", "shared.js", "paints.js", "chatlib.js", "background.js", "bg-chat.js"]
+    "scripts": ["config.js", "shared.js", "paints.js", "chatlib.js", "background.js", "bg-chat.js", "bg-emotes.js"]
   },
   "content_scripts": [
     {

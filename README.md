@@ -61,8 +61,12 @@ Audio processing only starts once you turn on the compressor, boost or mono, and
 Everything here can be turned on or off in the **Chat** tab.
 
 **Emotes**
-- **7TV emotes** in chat (the channel's set plus 7TV's global ones, including zero-width emotes), so you don't need the 7TV extension.
-  If the 7TV extension is installed too, it's left to draw its own emotes. Hover a 7TV emote for a big preview.
+- **7TV, BTTV and FFZ emotes** in chat: each channel's emotes plus the global ones, including zero-width (overlay) emotes,
+  so you don't need the 7TV, BetterTTV or FrankerFaceZ extensions for emotes. When two share a name, the channel's emote wins
+  (7TV, then BTTV, then FFZ). If the 7TV extension is installed too, it's left to draw its own emotes. Hover an emote for a big preview.
+- **7TV personal emotes**: emotes 7TV subscribers can use in any channel show on their messages.
+- **Live emote updates**: when the streamer adds or removes a 7TV or BTTV emote it changes right away, with a line in chat
+  saying what changed. FFZ has no live feed, so FFZ changes show within 10 minutes.
 - **Emote menu** (☺ next to Twitch's chat settings button): your favorites, recently used, your most used,
   popular in this chat, and the channel's and global 7TV emotes, with search. Click to add one to your message.
 - **Favorites**: right-click any emote in chat (Favorite emote) or in the menu.
@@ -162,7 +166,8 @@ The add-on reads chat on twitch.tv pages and keeps everything in your browser. T
 - **Publishing a paint**: your Twitch user ID, username and that one paint go to the paint server. Unpublish any time.
 - **Show other people's paints** (off until you turn it on): the usernames you see in chat are sent to the paint server so it can look up their paints. Nothing else is sent: no messages, cookies or account info.
 - **Connect to chat directly** (Chat tab, on by default): a logged-out, read-only connection to Twitch's chat server (`irc-ws.chat.twitch.tv`) joins the channels you have open. It never signs in and never sends messages.
-- **7TV emotes** (Chat tab, on by default): the channel's Twitch user ID is looked up from Twitch and sent to 7TV (`7tv.io`) to get its emote list. Emote images load from 7TV's servers (`cdn.7tv.app`).
+- **7TV, BTTV and FFZ emotes** (Chat tab, each on by default and each can be turned off): the channel's Twitch user ID is looked up from Twitch and sent to 7TV (`7tv.io`), BetterTTV (`api.betterttv.net`) and FrankerFaceZ (`api.frankerfacez.com`) to get its emote lists. Emote images load from their servers.
+- **Live emote updates and personal emotes** (on by default): the add-on keeps a connection to 7TV's event service (`events.7tv.io`) and BetterTTV's (`sockets.betterttv.net`) for the channels you have open, telling them only which channel it's watching. Nothing about you is sent.
 
 Chat messages, your activity history, your watch time, your emote usage and the moderation log are never sent anywhere.
 

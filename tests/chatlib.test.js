@@ -119,3 +119,51 @@ test("fmtDuration", () => {
   assert.equal(L.fmtDuration(7200), "2h");
   assert.equal(L.fmtDuration(1209600), "14d");
 });
+
+test("bttvEmote builds CDN URLs and marks overlay emotes", () => {
+  const e = L.bttvEmote({ id: "5e76d338d6581c3724c0f0b2", code: "catJAM", imageType: "gif" });
+  assert.equal(e.p, "bttv");
+  assert.equal(e.a, true);
+  assert.equal(e.s[0], "https://cdn.betterttv.net/emote/5e76d338d6581c3724c0f0b2/1x.webp");
+  assert.equal(L.bttvEmote({ id: "5849c9a4f52be01a7ee5f79d", code: "IceCold" }).z, true);
+  assert.equal(L.bttvEmote({ id: "../x", code: "bad" }), null);
+  assert.equal(L.bttvEmote({ id: "5e76d338d6581c3724c0f0b2", code: "two words" }), null);
+});
+
+test("ffzSets reads sets, skips modifiers and falls back to existing sizes", () => {
+  const data = { default_sets: [3], sets: {
+    3: { emoticons: [{ id: 25927, name: "CatBag", urls: { 1: "//x", 2: "//x" }, width: 32, height: 32 }, { id: 9, name: "ffzW", modifier: true }] },
+    4: { emoticons: [{ id: 1, name: "Other", urls: { 1: "//x" } }] }
+  } };
+  const g = L.ffzSets(data, data.default_sets);
+  assert.deepEqual(g.map((e) => e.n), ["CatBag"]);
+  assert.deepEqual(g[0].s, ["https://cdn.frankerfacez.com/emote/25927/1", "https://cdn.frankerfacez.com/emote/25927/2", "https://cdn.frankerfacez.com/emote/25927/2"]);
+  assert.equal(L.ffzSets(data).length, 2);
+});
+
+test("mergeEmotes keeps the first emote for a name", () => {
+  const m = L.mergeEmotes([{ n: "a", p: "7tv" }], [{ n: "a", p: "bttv" }, { n: "b", p: "bttv" }], null, [{ n: "c", p: "ffz" }]);
+  assert.deepEqual(m.map((e) => e.n + ":" + e.p), ["a:7tv", "b:bttv", "c:ffz"]);
+});
+
+test("apply7tvChange adds, removes and renames emotes", () => {
+  const entry = (id, name) => ({ id, name, data: { id, name, host: { url: "//cdn.7tv.app/emote/" + id } } });
+  const list = L.sevenTvSet([entry("a1", "KEKW"), entry("b2", "OMEGALUL")]);
+  const r = L.apply7tvChange(list, {
+    id: "set1",
+    pushed: [{ key: "emotes", index: 2, value: entry("c3", "catJAM") }],
+    pulled: [{ key: "emotes", index: 1, old_value: entry("b2", "OMEGALUL") }],
+    updated: [{ key: "emotes", old_value: entry("a1", "KEKW"), value: entry("a1", "KEKL") }]
+  });
+  assert.deepEqual(r.list.map((e) => e.n).sort(), ["KEKL", "catJAM"]);
+  assert.deepEqual(r.added.sort(), ["KEKL", "catJAM"]);
+  assert.deepEqual(r.removed.sort(), ["KEKW", "OMEGALUL"]);
+  assert.deepEqual(L.apply7tvChange(list, { pushed: [{ key: "name", value: "x" }] }).added, []);
+});
+
+test("sevenEntitlement finds the Twitch login and the personal set", () => {
+  const body = { id: "e1", kind: "entitlement", object: { id: "e1", kind: "EMOTE_SET", ref_id: "61f0aa", user: { id: "u1", connections: [{ platform: "YOUTUBE", username: "nope" }, { platform: "TWITCH", id: "123", username: "SomeOne" }] } } };
+  assert.deepEqual(L.sevenEntitlement(body), { kind: "EMOTE_SET", ref: "61f0aa", login: "someone" });
+  assert.equal(L.sevenEntitlement({ object: { kind: "EMOTE_SET", ref_id: "x", user: { connections: [] } } }), null);
+  assert.equal(L.sevenEntitlement(null), null);
+});
