@@ -34,10 +34,27 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
   See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
   See [Nametag paints](#nametag-paints).
+- **Player**: stream delay, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel.
+  See [Player and audio](#player-and-audio).
 - **Chat tools, moderation and auto-claim**: 7TV emotes, an emote menu, highlights, filters, deleted-message recovery and more.
   See [Chat tools](#chat-tools). They're all in the **Chat** tab.
 
 <img src="docs/popup.png" alt="Toolbar popup" width="300">
+
+## Player and audio
+
+In **Chat → Player & audio**, and from the 🎚 button in the player controls:
+- **Stream delay** (⏳) next to the viewer count and your watch time: how far behind the streamer you are, from Twitch's own
+  player (or the buffer size if the player doesn't say). Green under 4 s, yellow under 8 s, red above. Click it to jump closer to live.
+- **Audio compressor**, a reworked version of 7TV's: three presets (light, medium like 7TV, strong "night mode") with matching
+  makeup gain, plus a limiter so nothing clips, and a live meter of how much it's compressing.
+- **Volume boost** up to 400% for quiet streams, and **mono**.
+- **Volume control**: scroll over the video to change the volume (Shift for fine steps, step size adjustable), middle-click to mute,
+  with an on-screen volume readout. Twitch's own slider stays in sync.
+- **Volume per channel**: each channel remembers its own volume.
+
+Audio processing only starts once you turn on the compressor, boost or mono, and only after you've clicked the page
+(browsers require that), so it can't leave a stream silent. Turning everything off again takes the processing out of the path.
 
 ## Chat tools
 

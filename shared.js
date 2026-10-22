@@ -29,6 +29,14 @@ var TCW = (() => {
     watchTrack: true,          // track your own watch time per streamer (stored only on this computer)
     watchBadge: true,          // show it next to the live viewer count
     watchVisibleOnly: false,   // only count while the Twitch tab is visible
+    delayBadge: true,          // stream delay next to the viewer count (click to catch up)
+    audioComp: "off",          // off | light | medium | strong  (audio compressor)
+    audioBoost: 100,           // % volume, up to 400
+    audioMono: false,
+    audioButton: true,         // 🎚 button in the player controls
+    wheelVolume: true,         // scroll over the video for volume, middle-click to mute
+    volumeStep: 5,             // % per scroll step
+    rememberVolume: true,      // remember the volume for each channel
     // chat tools
     ircOn: true,               // read-only, anonymous connection to Twitch chat (deleted messages, bans, first-time chatters)
     emotes7tv: true,           // show 7TV emotes (channel + global) in chat

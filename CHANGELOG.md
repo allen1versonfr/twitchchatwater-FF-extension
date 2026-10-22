@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.1.0
+
+- **Stream delay** (⏳) next to the viewer count and watch time, colored by how far behind live you are. Click it to catch up.
+- **Audio compressor** with light / medium (like 7TV's) / strong presets, makeup gain, a limiter against clipping and a live meter.
+- **Volume boost** up to 400% and **mono**, from a new 🎚 button in the player or the Chat tab.
+- **Better volume control**: scroll over the video (Shift for fine steps), middle-click to mute, on-screen volume, and each channel
+  remembers its own volume.
+
 ## 3.0.0
 
 - **7TV emotes** in chat (channel + global, zero-width emotes stack), with a big preview on hover. No 7TV extension needed.

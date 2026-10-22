@@ -226,6 +226,31 @@
       </div>
 
       <div class="group">
+        <h2>Player &amp; audio</h2>
+        <div class="opt"><span class="lbl">Show the stream delay ⏳<small>Next to the viewer count: how far behind the streamer you are. Click it to jump closer to live.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="delayBadge"><span></span></span></div>
+        <div class="opt"><span class="lbl">Audio compressor<small>Quiet parts louder, loud parts quieter. A safety limiter stops clipping.</small></span>
+          <select data-setting="audioComp">
+            <option value="off">Off</option>
+            <option value="light">Light</option>
+            <option value="medium">Medium (like 7TV's)</option>
+            <option value="strong">Strong (night mode)</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Volume boost<small>Above 100% for quiet streams</small></span>
+          <input type="range" min="100" max="400" step="10" data-setting="audioBoost"><output data-for="audioBoost"></output></div>
+        <div class="opt"><span class="lbl">Mono<small>Both ears get the same sound</small></span>
+          <span class="switch"><input type="checkbox" data-setting="audioMono"><span></span></span></div>
+        <div class="opt"><span class="lbl">Audio button 🎚 in the player</span>
+          <span class="switch"><input type="checkbox" data-setting="audioButton"><span></span></span></div>
+        <div class="opt"><span class="lbl">Scroll over the video for volume<small>Shift for fine steps, middle-click to mute</small></span>
+          <span class="switch"><input type="checkbox" data-setting="wheelVolume"><span></span></span></div>
+        <div class="opt"><span class="lbl">Volume step<small>Percent per scroll</small></span>
+          <input type="number" min="1" max="25" step="1" data-setting="volumeStep"></div>
+        <div class="opt"><span class="lbl">Remember volume per channel</span>
+          <span class="switch"><input type="checkbox" data-setting="rememberVolume"><span></span></span></div>
+      </div>
+
+      <div class="group">
         <h2>Connection</h2>
         <div class="opt"><span class="lbl">Connect to chat directly<small>A read-only, logged-out connection to Twitch chat (like a signed-out viewer). Needed for deleted-message recovery, ban/timeout lines, the moderation log, first-time chatter marks and shared-chat hiding.</small></span>
           <span class="switch"><input type="checkbox" data-setting="ircOn"><span></span></span></div>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools and auto-claim for Twitch chat.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -24,7 +24,7 @@
   "content_scripts": [
     {
       "matches": ["*://*.twitch.tv/*"],
-      "js": ["shared.js", "paints.js", "chatlib.js", "content.js", "chat-input.js", "emotes.js", "chat-tools.js", "autoclaim.js"],
+      "js": ["shared.js", "paints.js", "chatlib.js", "content.js", "chat-input.js", "emotes.js", "chat-tools.js", "autoclaim.js", "player.js"],
       "css": ["content.css"],
       "run_at": "document_idle",
       "all_frames": true
