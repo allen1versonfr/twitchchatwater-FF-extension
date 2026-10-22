@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "2.5.0",
-  "description": "Highlights and beeps when people on your watchlist chat on Twitch, plus free nametag paints you can share.",
+  "version": "3.2.0",
+  "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools and auto-claim for Twitch chat.",
   "icons": {
     "48": "icons/icon-48.png",
     "96": "icons/icon-96.png"
@@ -19,12 +19,12 @@
     }
   },
   "background": {
-    "scripts": ["config.js", "shared.js", "paints.js", "background.js"]
+    "scripts": ["config.js", "shared.js", "paints.js", "chatlib.js", "background.js", "bg-chat.js", "bg-emotes.js"]
   },
   "content_scripts": [
     {
       "matches": ["*://*.twitch.tv/*"],
-      "js": ["shared.js", "paints.js", "content.js"],
+      "js": ["shared.js", "paints.js", "chatlib.js", "content.js", "chat-input.js", "emotes.js", "chat-tools.js", "autoclaim.js", "player.js"],
       "css": ["content.css"],
       "run_at": "document_idle",
       "all_frames": true

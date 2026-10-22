@@ -241,35 +241,41 @@ function renderActivity() {
   const sel = $("#activityUser");
   const keep = sel.value;
   const logins = [...new Set(state.log.map((e) => e.login))];
-  const hasPings = state.log.some((e) => e.kind);
+  const isPing = (e) => e.kind === "mention" || e.kind === "reply";
+  const hasPings = state.log.some(isPing);
+  const hasWords = state.log.some((e) => e.kind === "keyword");
+  const special = ["__pings", "__watch", "__words"];
   sel.replaceChildren(...[
     h("option", { value: "" }, "Everyone"),
     hasPings ? h("option", { value: "__pings" }, "Mentions & replies to me") : null,
-    hasPings ? h("option", { value: "__watch" }, "Watchlist only") : null,
+    hasWords ? h("option", { value: "__words" }, "Highlighted words") : null,
+    hasPings || hasWords ? h("option", { value: "__watch" }, "Watchlist only") : null,
     ...logins.map((l) => {
       const e = state.log.find((x) => x.login === l);
       return h("option", { value: l }, e.display || l);
     })
   ].filter(Boolean));
-  sel.value = logins.includes(keep) || (hasPings && (keep === "__pings" || keep === "__watch")) ? keep : "";
+  sel.value = logins.includes(keep) || (special.includes(keep) && [...sel.options].some((o) => o.value === keep)) ? keep : "";
 
   const entries = state.log.filter((e) =>
-    !sel.value || (sel.value === "__pings" ? !!e.kind : sel.value === "__watch" ? !e.kind : e.login === sel.value));
+    !sel.value || (sel.value === "__pings" ? isPing(e) : sel.value === "__words" ? e.kind === "keyword"
+      : sel.value === "__watch" ? !e.kind : e.login === sel.value));
   if (!entries.length) {
     $("#activity").replaceChildren(h("div", { class: "empty" },
       h("div", { class: "empty-title" }, "No activity yet"),
-      h("div", {}, "Messages from people on your watchlist, and anyone who @mentions or replies to you, show up here.")
+      h("div", {}, "Messages from people on your watchlist, anyone who @mentions or replies to you, and your highlighted words show up here.")
     ));
   } else {
     $("#activity").replaceChildren(...entries.map((e) => h("div", {
       class: "card entry" + (e.kind ? " ping" : ""),
-      style: { "--c": e.kind ? "#ff5f5f" : userColor(e.login, e.color) },
+      style: { "--c": e.kind === "keyword" ? e.color || state.settings.hlColor : e.kind ? "#ff5f5f" : userColor(e.login, e.color) },
       title: e.msgId ? "Jump to this message" : e.channel ? `Open #${e.channel}` : "",
       onclick: () => jumpTo(e)
     },
       h("div", { class: "entry-head" },
         h("b", {}, e.display || e.login),
-        e.kind ? h("span", { class: "ping-tag" }, e.kind === "reply" ? "replied to you" : "@ you") : null,
+        e.kind ? h("span", { class: "ping-tag" },
+          e.kind === "reply" ? "replied to you" : e.kind === "keyword" ? `“${e.term || "word"}”` : "@ you") : null,
         e.channel ? h("span", { class: "chan" }, "#" + e.channel) : null,
         h("span", { class: "time" }, ago(e.time))
       ),
@@ -335,6 +341,8 @@ function bindSettings() {
   $("#soundType").replaceChildren(...soundOptions(false));
   $("#mentionSound").replaceChildren(...soundOptions(false), h("option", { value: "none" }, "Silent"));
   $("#previewMention").addEventListener("click", () => playLocal(state.settings.mentionSound, state.settings.volume));
+  $("#hlSound").replaceChildren(...soundOptions(false), h("option", { value: "none" }, "Silent"));
+  $("#previewHl").addEventListener("click", () => playLocal(state.settings.hlSound, state.settings.volume));
   for (const el of $$("[data-setting]")) {
     if (el.type === "range") el.addEventListener("input", updateOutputs);
     el.addEventListener("change", () => {
@@ -347,6 +355,7 @@ function bindSettings() {
       send("setSettings", { patch: { [key]: v } });
       if (key === "soundType" || key === "volume") playLocal(state.settings.soundType, state.settings.volume);
       if (key === "mentionSound") playLocal(state.settings.mentionSound, state.settings.volume);
+      if (key === "hlSound") playLocal(state.settings.hlSound, state.settings.volume);
     });
   }
   $("#previewSound").addEventListener("click", () => playLocal(state.settings.soundType, state.settings.volume));
@@ -407,7 +416,7 @@ async function renderStatus() {
   if (!list || !list.length) {
     box.replaceChildren(h("div", { class: "empty" },
       h("div", { class: "empty-title" }, "No Twitch chat detected"),
-      h("div", {}, "Open a Twitch channel with the chat visible. If one is already open, reload that tab.")
+      h("div", {}, "Open a Twitch channel with the chat visible. If one is already open, press Connect open tabs below.")
     ));
     return;
   }
@@ -444,6 +453,12 @@ function stopStatus() {
 }
 
 function bindStatus() {
+  $("#injectNow").addEventListener("click", async () => {
+    let n = 0;
+    try { n = await send("injectAll"); } catch (e) { /* background starting */ }
+    $("#testMsg").textContent = n ? `Connected ${n} tab${n === 1 ? "" : "s"}.` : "Every open Twitch tab is already connected.";
+    renderStatus();
+  });
   $("#testAlert").addEventListener("click", async () => {
     if (state.settings.sound) playLocal(state.settings.soundType, state.settings.volume);
     let r = {};
@@ -531,6 +546,7 @@ async function init() {
 
   renderAll();
   let start = location.hash.slice(1);
+  if (start === "modlog") start = "activity"; // ui-watch.js opens the Mod log view
   if (!start) { try { start = localStorage.getItem("tcw-tab") || "people"; } catch (e) { start = "people"; } }
   showTab(start);
   send("clearBadge").catch(() => {});

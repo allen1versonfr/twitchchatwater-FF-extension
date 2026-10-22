@@ -26,11 +26,64 @@ var TCW = (() => {
     mentionSound: "chime",
     mentionNotify: false,      // desktop notification for mentions/replies
     mentionName: "",           // your Twitch username; blank = detect from twitch.tv
-    chattersBadge: true,       // show active chatters next to the viewer count
-    chattersWindow: 10,        // minutes; 0 = since you opened the channel
     watchTrack: true,          // track your own watch time per streamer (stored only on this computer)
     watchBadge: true,          // show it next to the live viewer count
     watchVisibleOnly: false,   // only count while the Twitch tab is visible
+    delayBadge: true,          // stream delay next to the viewer count (click to catch up)
+    audioComp: "off",          // off | light | medium | strong  (audio compressor)
+    audioBoost: 100,           // % volume, up to 400
+    audioMono: false,
+    audioButton: true,         // 🎚 button in the player controls
+    wheelVolume: true,         // scroll over the video for volume, middle-click to mute
+    volumeStep: 5,             // % per scroll step
+    rememberVolume: true,      // remember the volume for each channel
+    // chat tools
+    ircOn: true,               // read-only, anonymous connection to Twitch chat (deleted messages, bans, first-time chatters)
+    emotes7tv: true,           // show 7TV emotes (channel + global) in chat
+    emotesBttv: true,          // show BTTV emotes
+    emotesFfz: true,           // show FFZ emotes
+    emotesPersonal: true,      // show 7TV subscribers' personal emotes on their messages
+    emoteLive: true,           // live emote updates (7TV, BTTV; FFZ every 10 min) with a line in chat
+    emoteMenu: true,           // emote button next to the chat box (favorites, recent, most used, 7TV)
+    emoteColon: true,          // ":kek" suggestions while typing
+    emoteTab: true,            // Tab cycles through matching emotes
+    emoteSpam: true,           // offer a button to join in when an emote is being spammed
+    spamMin: 6,                // messages with the same emote within 10 s ...
+    spamUsers: 4,              // ... from at least this many people
+    inputHistory: true,        // Up/Down in an empty chat box recalls what you sent
+    hlWords: "",               // highlight messages containing these words (one per line, /regex/ allowed)
+    hlColor: "#ff9f1a",
+    hlSound: "ping",           // sound for highlighted words; "none" = silent
+    hlFlash: true,             // flash the tab title for highlighted words
+    hlNotify: false,
+    hlBadgeBroadcaster: false, // highlight messages by badge
+    hlBadgeMod: false,
+    hlBadgeVip: false,
+    hlBadgeStaff: false,
+    hlBadgeSub: false,
+    hlBadgeVerified: false,
+    filterWords: "",           // hide messages containing these words
+    filterUsers: "",           // hide messages from these people (bots etc.)
+    filterMode: "hide",        // hide | dim
+    timestamps: "off",         // off | 12 | 24 | 24s
+    chatFontSize: 0,           // 0 = Twitch's size
+    chatAltBg: false,          // alternating message backgrounds
+    chatSeparators: false,     // thin line between messages
+    hoverDetails: "shift",     // off | hover | shift  (message details popup)
+    hideShared: false,         // hide messages from the other channels in a shared chat
+    deletedMode: "show",       // twitch | show | strike | hide
+    modNotices: true,          // show bans and timeouts in chat
+    modLogOn: true,            // keep a moderation log (Activity → Mod log)
+    modIcons: true,            // quick timeout / ban buttons when you're a moderator
+    modCompat: true,           // when you're a moderator, clicking a name opens Twitch's card (with its mod tools)
+    indFirst: true,            // mark first-time chatters
+    indReturning: false,       // mark returning chatters
+    indRepeat: true,           // mark people who were timed out or banned earlier in this session
+    clearMode: "keep",         // twitch | keep  (what happens to messages when a moderator clears chat)
+    autoBonus: true,           // claim the channel-points bonus chest
+    autoMoments: true,         // claim Moments
+    autoDrops: true,           // claim Drops (in chat and on the inventory page)
+    autoDropsBg: false,        // check the Drops inventory every 30 minutes in a background tab
     paintServer: "",           // override of TCW_CONFIG.paintServer
     twitchClientId: "",        // override of TCW_CONFIG.twitchClientId
     debug: false

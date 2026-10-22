@@ -93,6 +93,7 @@ function setWatchView(view) {
   $$("[data-subview]").forEach((el) => { el.hidden = el.dataset.subview !== view; });
   try { localStorage.setItem("tcw-activity-view", view); } catch (e) { /* ignore */ }
   if (view === "watch") refreshWatch();
+  if (view === "modlog" && typeof renderModlog === "function") renderModlog();
 }
 
 async function refreshWatch() {
@@ -164,7 +165,8 @@ function initWatch() {
 
   let start = "messages";
   try { start = localStorage.getItem("tcw-activity-view") || "messages"; } catch (e) { /* ignore */ }
-  setWatchView(start === "watch" ? "watch" : "messages");
+  if (location.hash === "#modlog") start = "modlog";
+  setWatchView(["watch", "modlog"].includes(start) ? start : "messages");
 }
 
 initWatch();
