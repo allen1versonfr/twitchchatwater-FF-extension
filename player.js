@@ -12,7 +12,7 @@
   const S = () => C.settings;
   const el = (...a) => C.el(...a);
 
-  const VIEWERS_SEL = "[data-a-target='animated-channel-viewers-count'], [data-a-target='channel-viewers-count']";
+  const VIEWERS_SEL = "[data-a-target='animated-channel-viewers-count'], [data-a-target='channel-viewers-count'], [data-a-target*='viewers-count' i]";
   const PLAYER_SEL = "[data-a-target='video-player'], .video-player";
   const CONTROLS_SEL = ".player-controls__right-control-group, [data-a-target='player-controls'] .player-controls__right-control-group";
 
@@ -36,25 +36,39 @@
   }
 
   // The page's media player object, found through React's internals (read-only lookups, like 7TV and FFZ do).
+  // It's searched upward from the <video> element and from the player container, since the component that
+  // holds it sits somewhere between the two. A miss isn't remembered, so a player that loads late is still found.
   let instCache = null;
-  function playerInstance() {
-    const root = document.querySelector(PLAYER_SEL);
-    if (!root) return null;
-    if (instCache && instCache.root === root) return instCache.inst;
-    let inst = null;
-    try {
-      const page = root.wrappedJSObject || root;
-      const key = Object.keys(page).find((k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"));
-      let f = key ? page[key] : null;
-      for (let i = 0; f && i < 80 && !inst; i++, f = f.return) {
-        const p = f.memoizedProps;
-        const cand = p && (p.mediaPlayerInstance || (p.player && p.player.getLiveLatency ? p.player : null));
-        if (cand && typeof cand.getVolume === "function") inst = cand;
-      }
-    } catch (e) {
-      C.debug("player lookup failed", e);
+  function fiberOf(node) {
+    const page = node.wrappedJSObject || node;
+    const key = Object.keys(page).find((k) => k.startsWith("__reactFiber$") || k.startsWith("__reactInternalInstance$"));
+    return key ? page[key] : null;
+  }
+  function instanceFrom(p) {
+    if (!p) return null;
+    for (const c of [p.mediaPlayerInstance, p.player, p.mediaPlayer, p.playerInstance]) {
+      if (c && typeof c.getVolume === "function") return c;
     }
-    instCache = { root, inst };
+    return null;
+  }
+  function playerInstance() {
+    const vid = mainVideo();
+    const root = document.querySelector(PLAYER_SEL);
+    if (!vid && !root) return null;
+    if (instCache && instCache.vid === vid && instCache.root === root) return instCache.inst;
+    let inst = null;
+    for (const start of [vid, root]) {
+      if (!start || inst) continue;
+      try {
+        let f = fiberOf(start);
+        for (let i = 0; f && i < 200 && !inst; i++, f = f.return) {
+          inst = instanceFrom(f.memoizedProps) || instanceFrom(f.stateNode && f.stateNode.props);
+        }
+      } catch (e) {
+        C.debug("player lookup failed", e);
+      }
+    }
+    if (inst) instCache = { vid, root, inst };
     return inst;
   }
 
@@ -96,8 +110,23 @@
     try {
       if (vid.buffered.length) buffer = Math.max(0, vid.buffered.end(vid.buffered.length - 1) - vid.currentTime);
     } catch (e) { /* no buffer yet */ }
-    const lat = call(playerInstance(), "getLiveLatency");
-    return { latency: typeof lat === "number" && lat > 0 && lat < 600 ? lat : null, buffer, vid };
+    let lat = call(playerInstance(), "getLiveLatency");
+    if (!(typeof lat === "number" && lat > 0 && lat < 600)) lat = statsLatency();
+    return { latency: lat, buffer, vid };
+  }
+
+  // Twitch's own "Video Stats" overlay (gear → Advanced → Video Stats), when it's open.
+  function statsLatency() {
+    for (const row of document.querySelectorAll("[data-a-target='player-overlay-video-stats'] tr, .tw-video-stats tr, [data-a-target='player-overlay-video-stats'] div")) {
+      const t = row.textContent || "";
+      if (!/latency to (the )?broadcaster/i.test(t)) continue;
+      const m = /(\d+(?:\.\d+)?)\s*(s|sec|ms)/i.exec(t.replace(/latency to (the )?broadcaster/i, ""));
+      if (m) {
+        const v = Number(m[1]) / (m[2].toLowerCase() === "ms" ? 1000 : 1);
+        if (v > 0 && v < 600) return v;
+      }
+    }
+    return null;
   }
 
   function catchUp() {
@@ -112,32 +141,73 @@
     }
   }
 
-  function updateDelayBadge() {
-    let badge = document.getElementById("tcw-delay-badge");
-    const anchor = S().delayBadge ? document.querySelector(VIEWERS_SEL) : null;
-    const d = anchor ? delayInfo() : null;
-    const shown = d && (d.latency != null || d.buffer != null) && !d.vid.paused;
-    if (!shown) {
-      if (badge) badge.remove();
-      return;
-    }
-    if (!badge) {
-      badge = el("span", { id: "tcw-delay-badge", class: "tcw-watch tcw-delay", role: "button", tabindex: "0" });
-      badge.addEventListener("click", catchUp);
-      badge.addEventListener("keydown", (e) => { if (e.key === "Enter") catchUp(); });
-    }
+  function delayText(d) {
     const main = d.latency != null ? d.latency : d.buffer;
-    badge.textContent = "⏳ " + main.toFixed(1) + "s";
-    badge.classList.toggle("tcw-delay-mid", main >= 4 && main < 8);
-    badge.classList.toggle("tcw-delay-high", main >= 8);
     const parts = [];
     if (d.latency != null) parts.push(`Delay to the streamer: ${d.latency.toFixed(1)} s`);
     if (d.buffer != null) parts.push(`buffered: ${d.buffer.toFixed(1)} s`);
-    badge.title = parts.join(" · ") + (d.latency == null ? " (Twitch's player didn't report the full delay; this is the buffer)" : "") + ". Click to jump closer to live.";
-    badge.setAttribute("aria-label", badge.title);
-    const watch = document.getElementById("tcw-watch-badge");
-    const after = watch && watch.isConnected && watch.parentElement === anchor.parentElement ? watch : anchor;
-    if (after.nextElementSibling !== badge) after.after(badge);
+    const title = parts.join(" · ") +
+      (d.latency == null ? " (Twitch's player didn't report the full delay, so this is how much video is buffered)" : "") +
+      ". Click to jump closer to live.";
+    return { main, label: "⏳ " + main.toFixed(1) + "s", title };
+  }
+
+  function styleDelay(node, t) {
+    node.textContent = t.label;
+    node.title = t.title;
+    node.setAttribute("aria-label", t.title);
+    node.classList.toggle("tcw-delay-mid", t.main >= 4 && t.main < 8);
+    node.classList.toggle("tcw-delay-high", t.main >= 8);
+  }
+
+  function delayNode(id, cls) {
+    let n = document.getElementById(id);
+    if (!n) {
+      n = el("span", { id, class: cls, role: "button", tabindex: "0" });
+      n.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); catchUp(); });
+      n.addEventListener("keydown", (e) => { if (e.key === "Enter") catchUp(); });
+    }
+    return n;
+  }
+
+  // Shown in two places: next to the viewer count (with the watch time) and in the player's control bar,
+  // so it's visible even in layouts where Twitch hides or renames the viewer count.
+  function updateDelayBadge() {
+    const d = S().delayBadge ? delayInfo() : null;
+    const ok = d && (d.latency != null || d.buffer != null) && !d.vid.paused;
+    const t = ok ? delayText(d) : null;
+    C.debug("delay", d && { latency: d.latency, buffer: d.buffer });
+
+    const anchor = ok ? document.querySelector(VIEWERS_SEL) : null;
+    if (!anchor) {
+      const old = document.getElementById("tcw-delay-badge");
+      if (old) old.remove();
+    } else {
+      const badge = delayNode("tcw-delay-badge", "tcw-watch tcw-delay");
+      styleDelay(badge, t);
+      const watch = document.getElementById("tcw-watch-badge");
+      const after = watch && watch.isConnected && watch.parentElement === anchor.parentElement ? watch : anchor;
+      if (after.nextElementSibling !== badge) after.after(badge);
+    }
+
+    const group = ok ? document.querySelector(CONTROLS_SEL) : null;
+    const root = ok ? document.querySelector(PLAYER_SEL) : null;
+    const chip = document.getElementById("tcw-delay-chip");
+    if (!group && !root) {
+      if (chip) chip.remove();
+      return;
+    }
+    const c = delayNode("tcw-delay-chip", "tcw-delay-chip");
+    styleDelay(c, t);
+    if (group) {
+      c.classList.remove("tcw-delay-float");
+      const btn = document.getElementById("tcw-audio-btn");
+      if (btn && btn.parentElement === group) { if (btn.nextElementSibling !== c) btn.after(c); }
+      else if (c.parentElement !== group) group.prepend(c);
+    } else {
+      c.classList.add("tcw-delay-float"); // no control bar found: a small label in the player's corner
+      if (c.parentElement !== root) root.append(c);
+    }
   }
 
   // ---------- audio processing ----------

@@ -356,3 +356,15 @@ html.tw-root--theme-light .tcw-watch.tcw-delay { background: rgba(0, 173, 3, .16
 .tcw-audio-meter span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00ad03, #ffb300, #eb0400); transition: width .15s; }
 .tcw-audio-note { color: #adadb8; font-size: 11px; margin-top: 4px; }
 .tcw-notice-emote { color: #bf94ff; }
+.tcw-delay-chip {
+  display: inline-flex; align-items: center; height: 30px; padding: 0 8px; margin: 0 2px; border-radius: 4px;
+  color: #fff; font: 600 13px/30px system-ui, sans-serif; white-space: nowrap; cursor: pointer;
+  font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}
+.tcw-delay-chip:hover { background: rgba(255, 255, 255, .15); }
+.tcw-delay-chip.tcw-delay-mid { color: #ffd166; }
+.tcw-delay-chip.tcw-delay-high { color: #ff7b7b; }
+.tcw-delay-chip.tcw-delay-float {
+  position: absolute; top: 10px; left: 10px; z-index: 10; height: 24px; line-height: 24px;
+  background: rgba(0, 0, 0, .55);
+}

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.1
+
+- Fix: the stream delay didn't show. It's now also shown in the player's control bar (next to 🎚), so it appears even when
+  Twitch's viewer count isn't found, and the delay is read from Twitch's player more reliably (with Twitch's own Video Stats
+  and the buffer size as fallbacks).
+
 ## 3.2.0
 
 - **BTTV and FFZ emotes** in chat, the emote menu, `:` suggestions and Tab completion, next to 7TV's
