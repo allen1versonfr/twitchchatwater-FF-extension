@@ -395,6 +395,75 @@
     applyAudio();
   }
 
+  // ---------- refresh button ----------
+  // Reloads the stream inside Twitch's player, the way FFZ's "reset player" does: the React component that feeds
+  // the player its source (the one with setSrc) is asked to set it again. VODs go back to where they were.
+  // If that component can't be found, the page is reloaded instead.
+
+  function sourceComponent() {
+    const starts = [mainVideo(), document.querySelector(PLAYER_SEL)].filter(Boolean);
+    for (const start of starts) {
+      try {
+        let f = fiberOf(start);
+        for (let i = 0; f && i < 200; i++, f = f.return) {
+          const n = f.stateNode;
+          if (n && typeof n.setSrc === "function" && typeof n.setInitialPlaybackSettings === "function") return n;
+        }
+      } catch (e) {
+        C.debug("player source lookup failed", e);
+      }
+    }
+    return null;
+  }
+
+  let refreshing = false;
+  async function refreshPlayer() {
+    if (refreshing) return;
+    const src = sourceComponent();
+    if (!src) {
+      C.toast("Reloading the page (couldn't reach Twitch's player)");
+      setTimeout(() => location.reload(), 600);
+      return;
+    }
+    refreshing = true;
+    const btn = document.getElementById("tcw-refresh-btn");
+    if (btn) btn.classList.add("tcw-spin");
+    const inst = playerInstance();
+    const dur = Number(call(inst, "getDuration"));
+    const pos = isFinite(dur) && dur > 0 ? Number(call(inst, "getPosition")) : -1;
+    const done = () => {
+      refreshing = false;
+      setTimeout(() => { const b = document.getElementById("tcw-refresh-btn"); if (b) b.classList.remove("tcw-spin"); }, 800);
+    };
+    let job;
+    try {
+      const arg = typeof cloneInto === "function" ? cloneInto({ isNewMediaPlayerInstance: false }, window) : { isNewMediaPlayerInstance: false };
+      job = src.setSrc(arg);
+    } catch (e) {
+      C.debug("player refresh failed", e);
+      done();
+      C.toast("Reloading the page (Twitch's player didn't refresh)");
+      setTimeout(() => location.reload(), 600);
+      return;
+    }
+    try { await job; } catch (e) { C.debug("player refresh: setSrc rejected", e); }
+    instCache = null;
+    if (pos > 0) setTimeout(() => call(playerInstance(), "seekTo", pos), 250);
+    C.toast("Player refreshed");
+    done();
+  }
+
+  function ensureRefreshButton() {
+    const group = S().refreshButton ? document.querySelector(CONTROLS_SEL) : null;
+    const old = document.getElementById("tcw-refresh-btn");
+    if (!group) { if (old && !S().refreshButton) old.remove(); return; }
+    if (old && group.contains(old)) return;
+    if (old) old.remove();
+    const b = el("button", { id: "tcw-refresh-btn", class: "tcw-player-btn", title: "Refresh player (Chat Watcher)", "aria-label": "Refresh player (Chat Watcher)" }, "⟳");
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); refreshPlayer(); });
+    group.prepend(b);
+  }
+
   // ---------- audio panel (button in the player controls) ----------
 
   let panel = null;
@@ -482,6 +551,7 @@
         if (panel) renderPanel();
       }
       if (keys.has("audioButton")) ensureButton();
+      if (keys.has("refreshButton")) ensureRefreshButton();
       if (keys.has("delayBadge")) updateDelayBadge();
     }
   });
@@ -495,9 +565,10 @@
     }
     trackVideo();
     ensureButton();
+    ensureRefreshButton();
     updateDelayBadge();
   }, 2000);
   setInterval(updateMeter, 200);
 
-  C.player = { delayInfo, getVolume, setVolume, PRESETS };
+  C.player = { delayInfo, getVolume, setVolume, refreshPlayer, PRESETS };
 })();
