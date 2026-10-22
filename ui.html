@@ -19,6 +19,7 @@
   <nav class="tabs">
     <button data-tab="people">People</button>
     <button data-tab="activity">Activity <span id="activityPill" class="pill" hidden></span></button>
+    <button data-tab="chat">Chat</button>
     <button data-tab="paints">Paints</button>
     <button data-tab="settings">Settings</button>
     <button data-tab="status">Status</button>
@@ -45,6 +46,7 @@
       <div class="seg view-switch" role="tablist" aria-label="Activity view">
         <button type="button" role="tab" data-view="messages" aria-selected="true" class="on">Messages</button>
         <button type="button" role="tab" data-view="watch" aria-selected="false">Watch time</button>
+        <button type="button" role="tab" data-view="modlog" aria-selected="false">Mod log</button>
       </div>
       <div data-subview="messages">
         <div class="list-tools">
@@ -66,6 +68,167 @@
         </div>
         <div id="watchList" class="list"></div>
         <p class="hint">Counted only while a stream is actually playing on its channel page. Stored only on this computer.</p>
+      </div>
+      <div data-subview="modlog" hidden>
+        <div class="list-tools">
+          <select id="modlogChannel" aria-label="Filter by channel"><option value="">All channels</option></select>
+          <input id="modlogFilter" type="search" placeholder="Search names or text" aria-label="Search the moderation log">
+          <button id="clearModlog" class="btn ghost small">Clear</button>
+        </div>
+        <div id="modlog" class="list"></div>
+        <p class="hint">Bans, timeouts, deleted messages and chat clears in channels you had open. Stored only on this computer.</p>
+      </div>
+    </section>
+
+    <!-- CHAT -->
+    <section data-panel="chat" hidden>
+      <div class="group">
+        <h2>Emotes</h2>
+        <div class="opt"><span class="lbl">Show 7TV emotes<small>The channel's 7TV emotes and 7TV's global ones, right in chat. No 7TV extension needed.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="emotes7tv"><span></span></span></div>
+        <div class="opt"><span class="lbl">Emote menu button (☺)<small>Next to the chat box: favorites, recently used, your most used, popular in this chat, 7TV</small></span>
+          <span class="switch"><input type="checkbox" data-setting="emoteMenu"><span></span></span></div>
+        <div class="opt"><span class="lbl">Suggestions while typing “:”<small>Type :kek to see matching emotes; Tab or Enter inserts one</small></span>
+          <span class="switch"><input type="checkbox" data-setting="emoteColon"><span></span></span></div>
+        <div class="opt"><span class="lbl">Tab completion<small>Type part of a name and press Tab to cycle through matching emotes (Shift+Tab goes back)</small></span>
+          <span class="switch"><input type="checkbox" data-setting="emoteTab"><span></span></span></div>
+        <div class="opt"><span class="lbl">Join in on emote spam<small>When chat spams one emote, a button appears that sends it for you</small></span>
+          <span class="switch"><input type="checkbox" data-setting="emoteSpam"><span></span></span></div>
+        <div class="opt"><span class="lbl">Spam means<small>Messages with the same emote within 10 seconds, from at least this many people</small></span>
+          <input type="number" min="2" max="50" step="1" data-setting="spamMin" aria-label="Messages">
+          <input type="number" min="1" max="50" step="1" data-setting="spamUsers" aria-label="People"></div>
+        <div class="opt"><span class="lbl">Message history<small>↑ / ↓ in an empty chat box brings back what you sent (this tab only)</small></span>
+          <span class="switch"><input type="checkbox" data-setting="inputHistory"><span></span></span></div>
+        <div class="opt col"><span class="lbl">Your emotes<small id="emoteSummary">—</small></span>
+          <div id="emoteTop" class="emote-top"></div></div>
+        <div class="opt"><span class="lbl">Reset emote usage<small>Most used and recently used (favorites stay)</small></span>
+          <button id="resetEmotes" class="btn danger small">Reset</button></div>
+      </div>
+
+      <div class="group">
+        <h2>Highlight words</h2>
+        <div class="opt col"><span class="lbl">Words or phrases<small>One per line. Whole words, any case. Use /pattern/ for a regular expression.</small></span>
+          <textarea data-setting="hlWords" placeholder="e.g. giveaway&#10;my clip&#10;/\bgg\b/" spellcheck="false"></textarea></div>
+        <div class="opt"><span class="lbl">Color</span>
+          <input type="color" class="swatch" data-setting="hlColor" aria-label="Highlight color"></div>
+        <div class="opt"><span class="lbl">Sound</span>
+          <select data-setting="hlSound" id="hlSound"></select>
+          <button id="previewHl" class="icon-btn" title="Preview">▶</button></div>
+        <div class="opt"><span class="lbl">Flash the tab title<small>When the Twitch tab is in the background</small></span>
+          <span class="switch"><input type="checkbox" data-setting="hlFlash"><span></span></span></div>
+        <div class="opt"><span class="lbl">Desktop notification</span>
+          <span class="switch"><input type="checkbox" data-setting="hlNotify"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Highlight by badge</h2>
+        <div class="opt"><span class="lbl">Broadcaster</span><span class="switch"><input type="checkbox" data-setting="hlBadgeBroadcaster"><span></span></span></div>
+        <div class="opt"><span class="lbl">Moderators</span><span class="switch"><input type="checkbox" data-setting="hlBadgeMod"><span></span></span></div>
+        <div class="opt"><span class="lbl">VIPs</span><span class="switch"><input type="checkbox" data-setting="hlBadgeVip"><span></span></span></div>
+        <div class="opt"><span class="lbl">Twitch staff &amp; admins</span><span class="switch"><input type="checkbox" data-setting="hlBadgeStaff"><span></span></span></div>
+        <div class="opt"><span class="lbl">Subscribers &amp; founders</span><span class="switch"><input type="checkbox" data-setting="hlBadgeSub"><span></span></span></div>
+        <div class="opt"><span class="lbl">Verified (partners)</span><span class="switch"><input type="checkbox" data-setting="hlBadgeVerified"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Filter messages</h2>
+        <div class="opt col"><span class="lbl">Hide messages containing<small>One per line, same rules as highlight words</small></span>
+          <textarea data-setting="filterWords" spellcheck="false"></textarea></div>
+        <div class="opt col"><span class="lbl">Hide messages from<small>Usernames, e.g. bots: nightbot, streamelements</small></span>
+          <textarea data-setting="filterUsers" spellcheck="false"></textarea></div>
+        <div class="opt"><span class="lbl">Filtered messages are</span>
+          <select data-setting="filterMode">
+            <option value="hide">Hidden</option>
+            <option value="dim">Faded (hover to read)</option>
+          </select></div>
+      </div>
+
+      <div class="group">
+        <h2>Chat appearance</h2>
+        <div class="opt"><span class="lbl">Timestamps<small>On new messages (Twitch's own timestamps win if you turned those on)</small></span>
+          <select data-setting="timestamps">
+            <option value="off">Off</option>
+            <option value="12">12-hour</option>
+            <option value="24">24-hour</option>
+            <option value="24s">24-hour with seconds</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Text size</span>
+          <select data-setting="chatFontSize">
+            <option value="0">Twitch default</option>
+            <option value="12">12 px</option>
+            <option value="13">13 px</option>
+            <option value="14">14 px</option>
+            <option value="16">16 px</option>
+            <option value="18">18 px</option>
+            <option value="20">20 px</option>
+            <option value="24">24 px</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Alternating backgrounds</span>
+          <span class="switch"><input type="checkbox" data-setting="chatAltBg"><span></span></span></div>
+        <div class="opt"><span class="lbl">Lines between messages</span>
+          <span class="switch"><input type="checkbox" data-setting="chatSeparators"><span></span></span></div>
+        <div class="opt"><span class="lbl">Message details<small>Full message, exact time, badges, first-time chatter, deleted status</small></span>
+          <select data-setting="hoverDetails">
+            <option value="shift">Hover + hold Shift</option>
+            <option value="hover">On hover</option>
+            <option value="off">Off</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Hide shared chat<small>During a Shared Chat, only show messages sent in the channel you're watching</small></span>
+          <span class="switch"><input type="checkbox" data-setting="hideShared"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Deleted messages</h2>
+        <div class="opt"><span class="lbl">When a message is deleted or its sender is timed out<small>Recovered text, including links, comes from messages this tab saw before they were removed</small></span>
+          <select data-setting="deletedMode">
+            <option value="show">Show what it said</option>
+            <option value="strike">Show it crossed out</option>
+            <option value="twitch">Twitch default</option>
+            <option value="hide">Hide it completely</option>
+          </select></div>
+      </div>
+
+      <div class="group">
+        <h2>Moderation</h2>
+        <div class="opt"><span class="lbl">Show bans and timeouts in chat<small>Twitch only shows these to moderators</small></span>
+          <span class="switch"><input type="checkbox" data-setting="modNotices"><span></span></span></div>
+        <div class="opt"><span class="lbl">Keep a moderation log<small>Activity → Mod log, and the 🛡 button next to the chat box</small></span>
+          <span class="switch"><input type="checkbox" data-setting="modLogOn"><span></span></span></div>
+        <div class="opt"><span class="lbl">When chat is cleared<small>Twitch removes the messages; “keep” adds a line you can expand to read them</small></span>
+          <select data-setting="clearMode">
+            <option value="keep">Keep a copy</option>
+            <option value="twitch">Twitch default</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Mark first-time chatters 🌱</span>
+          <span class="switch"><input type="checkbox" data-setting="indFirst"><span></span></span></div>
+        <div class="opt"><span class="lbl">Mark returning chatters ↩</span>
+          <span class="switch"><input type="checkbox" data-setting="indReturning"><span></span></span></div>
+        <div class="opt"><span class="lbl">Mark people timed out earlier ⚠<small>Banned or timed out since you opened the channel</small></span>
+          <span class="switch"><input type="checkbox" data-setting="indRepeat"><span></span></span></div>
+        <div class="opt"><span class="lbl">Quick mod buttons<small>When you're a moderator: hover a message for purge / time out / ban. Bulk removal is in the 🛡 menu.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="modIcons"><span></span></span></div>
+        <div class="opt"><span class="lbl">Twitch's mod tools first<small>When you're a moderator, clicking a name opens Twitch's own card, and filters fade messages instead of hiding them</small></span>
+          <span class="switch"><input type="checkbox" data-setting="modCompat"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Auto-claim</h2>
+        <div class="opt"><span class="lbl">Channel-points bonus<small>Clicks the bonus chest when it appears</small></span>
+          <span class="switch"><input type="checkbox" data-setting="autoBonus"><span></span></span></div>
+        <div class="opt"><span class="lbl">Moments</span>
+          <span class="switch"><input type="checkbox" data-setting="autoMoments"><span></span></span></div>
+        <div class="opt"><span class="lbl">Drops<small>In chat, and on twitch.tv/drops/inventory while it's open</small></span>
+          <span class="switch"><input type="checkbox" data-setting="autoDrops"><span></span></span></div>
+        <div class="opt"><span class="lbl">Check Drops in the background<small>Every 30 minutes while Twitch is open: opens your Drops inventory in a muted background tab, claims, and closes it</small></span>
+          <span class="switch"><input type="checkbox" data-setting="autoDropsBg"><span></span></span></div>
+        <div class="opt"><span class="lbl" id="claimSummary">Nothing claimed yet</span>
+          <button id="dropsNow" class="btn ghost small">Check Drops now</button></div>
+      </div>
+
+      <div class="group">
+        <h2>Connection</h2>
+        <div class="opt"><span class="lbl">Connect to chat directly<small>A read-only, logged-out connection to Twitch chat (like a signed-out viewer). Needed for deleted-message recovery, ban/timeout lines, the moderation log, first-time chatter marks and shared-chat hiding.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="ircOn"><span></span></span></div>
       </div>
     </section>
 
@@ -176,20 +339,6 @@
       </div>
 
       <div class="group">
-        <h2>Active chatters</h2>
-        <div class="opt"><span class="lbl">Show active chatters next to the viewer count<small>People who sent a message. Twitch doesn't show who's connected to chat, only who talks.</small></span>
-          <span class="switch"><input type="checkbox" data-setting="chattersBadge"><span></span></span></div>
-        <div class="opt"><span class="lbl">Count people who chatted in the last</span>
-          <select data-setting="chattersWindow">
-            <option value="5">5 minutes</option>
-            <option value="10">10 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">hour</option>
-            <option value="0">since I opened the channel</option>
-          </select></div>
-      </div>
-
-      <div class="group">
         <h2>Watch time</h2>
         <div class="opt"><span class="lbl">Track my watch time<small>Per streamer, stored only on this computer (never synced or sent anywhere)</small></span>
           <span class="switch"><input type="checkbox" data-setting="watchTrack"><span></span></span></div>
@@ -264,8 +413,10 @@
 </div>
 <script src="shared.js"></script>
 <script src="paints.js"></script>
+<script src="chatlib.js"></script>
 <script src="ui.js"></script>
 <script src="ui-paints.js"></script>
 <script src="ui-watch.js"></script>
+<script src="ui-chat.js"></script>
 </body>
 </html>

@@ -382,3 +382,17 @@ body.full .stat { background: var(--panel2); }
   font-size: 11px; font-weight: 700; color: #fff; background: #d63c3c; border-radius: 999px; padding: 0 6px; white-space: nowrap;
 }
 .entry.ping { background: color-mix(in srgb, #ff5f5f 8%, var(--panel)); }
+
+/* ---------- chat tab ---------- */
+.emote-top { display: flex; flex-wrap: wrap; gap: 6px; }
+.emote-top:empty { display: none; }
+.emote-chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 4px; border-radius: 999px;
+  background: var(--panel2); border: 1px solid var(--line); font-size: 12px; max-width: 100%;
+}
+.emote-chip img { height: 22px; width: auto; max-width: 60px; }
+.emote-chip small { color: var(--muted); }
+.opt input[type=color].swatch { width: 30px; height: 26px; }
+.entry.modlog { cursor: default; }
+.entry.modlog:hover { border-color: var(--line); border-left-color: var(--c); }
+.view-switch button { white-space: nowrap; }

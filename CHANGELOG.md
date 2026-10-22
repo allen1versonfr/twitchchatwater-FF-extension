@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.0.0
+
+- **7TV emotes** in chat (channel + global, zero-width emotes stack), with a big preview on hover. No 7TV extension needed.
+- **Emote menu** (☺ next to the chat box): favorites, recently used, your most used, popular in this chat, 7TV, with search.
+  Right-click any emote to favorite it. Your emote usage is counted on this computer and shown in the Chat tab.
+- **`:` emote suggestions** and a **Tab completion carousel** while typing.
+- **Join in on emote spam**: a button that sends the emote chat is spamming (only when you click it).
+- **Message history**: ↑/↓ in an empty chat box.
+- **Highlight words** (with color, sound, title flashing, optional notification; shown in Activity) and **highlight by badge**.
+- **Filters** for words and people, **timestamps**, text size, alternating backgrounds, separators,
+  **message details** on hover + Shift, and **hide shared chat**.
+- **Deleted-message and deleted-link recovery**: see what a deleted or timed-out message said (links stay clickable),
+  crossed out or hidden if you prefer.
+- **Moderation**: ban/timeout lines in chat, a 🛡 moderation panel, Activity → Mod log, first-time / returning /
+  timed-out-before marks, a copy of chat when it's cleared, and for moderators: hover purge/timeout/ban buttons and bulk removal
+  (sent as Twitch's own chat commands). With "Twitch's mod tools first", moderators get Twitch's own card on name clicks.
+- **Auto-claim** the channel-points bonus, Moments and Drops (plus an optional background Drops check every 30 minutes).
+- The add-on now keeps a logged-out, read-only connection to Twitch chat for the channels you have open (can be turned off).
+- Removed the active chatters counter next to the viewer count.
+
 ## 2.5.0
 
 - **Active chatters** next to the viewer count (💬): how many different people chatted in the last 10 minutes

@@ -80,6 +80,56 @@
 
   const debug = (...a) => { if (settings.debug) console.log("[Chat Watcher]", ...a); };
 
+  // The chat tools (chat-input.js, emotes.js, chat-tools.js, autoclaim.js) plug in here.
+  // line(row, info): a new chat row · changed(row): Twitch changed an existing row (e.g. deleted it)
+  // settings(settings, changedKeys|null) · nav(channel): the page moved to another channel
+  const hooks = { line: [], changed: [], settings: [], nav: [] };
+  let started = false;
+  // A module registers its hooks here. If chat is already being read, it gets the settings and
+  // every row seen so far right away, so the order the scripts happen to run in doesn't matter.
+  function attach(h) {
+    for (const k of Object.keys(hooks)) if (typeof h[k] === "function") hooks[k].push(h[k]);
+    if (!started) return;
+    try {
+      if (h.settings) h.settings(settings, null);
+      if (h.line) {
+        for (const line of tracked) {
+          if (!line.isConnected) continue;
+          const author = getAuthor(line);
+          if (!author.names.length) continue;
+          h.line(line, { author, login: author.names[0], text: getText(line, author.display), live: false, id: line.dataset.tcwId });
+        }
+      }
+    } catch (e) {
+      debug("attach failed", e);
+    }
+  }
+  function runHooks(kind, ...args) {
+    for (const f of hooks[kind]) {
+      try { f(...args); } catch (e) { debug("hook failed", kind, e); }
+    }
+  }
+  globalThis.TCWChat = {
+    hooks, attach, LINE_SEL, NAME_SEL, BODY_SEL, CONTAINER_SEL,
+    get settings() { return settings; },
+    get users() { return users; },
+    isTop: window === window.top,
+    isMod: () => false, // replaced by chat-tools.js
+    currentChannel: () => currentChannel(),
+    myLogin: () => myLogin(),
+    getAuthor: (line) => getAuthor(line),
+    getText: (line, display) => getText(line, display),
+    findChatRow: (node) => findChatRow(node),
+    lines: () => tracked,
+    loginOf: (line) => lineLogin.get(line),
+    playLocal: (type, volume) => playLocal(type, volume),
+    flashTitle: (name, text, force) => flashTitle(name, text, force),
+    toast: (text) => toast(text),
+    jumpLocal: (id) => jumpLocal(id),
+    el: (...a) => el(...a),
+    debug: (...a) => debug(...a)
+  };
+
   // ---------- settings ----------
 
   function setUsers(list) {
@@ -215,8 +265,8 @@
 
   let baseTitle = null;
   let flashTimer = null;
-  function flashTitle(name, text) {
-    if (!settings.flashTitle || !IS_TOP || !document.hidden) return;
+  function flashTitle(name, text, force) {
+    if ((!settings.flashTitle && !force) || !IS_TOP || !document.hidden) return;
     if (baseTitle === null) baseTitle = document.title;
     let on = false;
     clearInterval(flashTimer);
@@ -294,54 +344,7 @@
     lineLogin.set(line, author.names[0]);
     paintLine(line, author.names[0]);
     checkMention(line, author, live, text);
-    noteChatter(author.names[0]);
-  }
-
-  // ---------- active chatters (counted from the chat this tab shows) ----------
-  // Twitch doesn't expose who is connected to a chat (only moderators can get that list), so this counts
-  // the different people who actually sent a message.
-
-  let chatters = new Map(); // login -> last message time
-  let chattersChannel = "";
-  let chattersSince = Date.now();
-
-  function noteChatter(login) {
-    const ch = currentChannel();
-    if (!login || !ch) return;
-    if (ch !== chattersChannel) {
-      chatters = new Map();
-      chattersChannel = ch;
-      chattersSince = Date.now();
-    }
-    chatters.set(login, Date.now());
-    if (chatters.size > 50000) chatters.delete(chatters.keys().next().value);
-  }
-
-  function chatterCounts() {
-    const win = Number(settings.chattersWindow) || 0;
-    const cutoff = win ? Date.now() - win * 60000 : 0;
-    let active = 0;
-    for (const t of chatters.values()) if (t >= cutoff) active++;
-    return { active, total: chatters.size, win };
-  }
-
-  function updateChattersBadge(ch) {
-    let badge = document.getElementById("tcw-chatters-badge");
-    const anchor = ch && settings.chattersBadge ? document.querySelector(VIEWERS_SEL) : null;
-    if (!anchor || ch !== chattersChannel) {
-      if (badge) badge.remove();
-      return;
-    }
-    const c = chatterCounts();
-    if (!badge) badge = el("span", { id: "tcw-chatters-badge", class: "tcw-watch tcw-chatters" });
-    const fmt = (n) => n.toLocaleString();
-    const opened = TCW.ago(chattersSince).replace(" ago", "");
-    badge.textContent = "💬 " + fmt(c.active);
-    badge.title = c.win
-      ? `${fmt(c.active)} people chatted in the last ${c.win} min · ${fmt(c.total)} since you opened this channel (${opened} ago). Counted by Chat Watcher from this chat.`
-      : `${fmt(c.total)} people chatted since you opened this channel (${opened} ago). Counted by Chat Watcher from this chat.`;
-    badge.setAttribute("aria-label", badge.title);
-    if (anchor.nextElementSibling !== badge) anchor.after(badge);
+    runHooks("line", line, { author, login: author.names[0], text, live, id });
   }
 
   // ---------- mentions & replies to you ----------
@@ -813,6 +816,8 @@
 
   function onNameClick(e) {
     if (bypassClick || settings.cardTrigger === "off" || e.button !== 0) return;
+    if (settings.modCompat && globalThis.TCWChat.isMod()) return; // moderators get Twitch's card with its mod tools
+    if (document.documentElement.classList.contains("tcw-bulk")) return; // picking messages for bulk removal
     const wantMod = settings.cardTrigger === "ctrl";
     if (wantMod !== (e.ctrlKey || e.metaKey)) return;
     const t = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
@@ -898,13 +903,27 @@
       lastHref = location.href;
       readyAt = Date.now() + settings.backlogSeconds * 1000; // skip the history Twitch loads on a new channel
       for (const line of tracked) if (!line.isConnected) tracked.delete(line);
+      runHooks("nav", currentChannel());
     }
+    let changed = null;
     for (const m of mutations) {
+      if (hooks.changed.length && m.target.nodeType === 1 && !ownNodes(m)) {
+        const owner = m.target.closest(LINE_SEL);
+        if (owner && seen.has(owner)) (changed || (changed = new Set())).add(owner);
+      }
       for (const node of m.addedNodes) {
         if (node.nodeType !== 1) continue;
         for (const line of findLines(node)) processLine(line, true);
       }
     }
+    if (changed) for (const line of changed) runHooks("changed", line);
+  }
+
+  // true when a mutation only added or removed the add-on's own elements
+  function ownNodes(m) {
+    const nodes = [...m.addedNodes, ...m.removedNodes];
+    if (!nodes.length) return false;
+    return nodes.every((n) => n.nodeType === 1 && typeof n.className === "string" && n.className.startsWith("tcw-"));
   }
 
   // ---------- status + messaging ----------
@@ -954,7 +973,6 @@
       }
     } catch (e) { /* background restarting */ }
     watchWasPlaying = playing;
-    updateChattersBadge(currentChannel());
     updateWatchBadge(ch);
   }
 
@@ -973,9 +991,7 @@
     badge.textContent = "⏱ " + TCW.duration(info.total);
     badge.title = `Your watch time on ${name}: ${TCW.duration(info.total)} total, ${TCW.duration(info.today)} today (Chat Watcher)`;
     badge.setAttribute("aria-label", badge.title);
-    const after = document.getElementById("tcw-chatters-badge");
-    const ref = after && after.previousElementSibling === anchor ? after : anchor;
-    if (ref.nextElementSibling !== badge) ref.after(badge);
+    if (anchor.nextElementSibling !== badge) anchor.after(badge);
   }
 
   if (IS_TOP) {
@@ -1050,19 +1066,18 @@
     }
     if (!(ch.settings || ch.users)) return;
     if (ch.settings) {
-      const before = settings.paintServer;
+      const prev = settings;
       settings = { ...TCW.DEFAULT_SETTINGS, ...(ch.settings.newValue || {}) };
-      if (settings.paintServer !== before) remotePaints.clear();
+      if (settings.paintServer !== prev.paintServer) remotePaints.clear();
+      const keys = Object.keys(settings).filter((k) => JSON.stringify(settings[k]) !== JSON.stringify(prev[k]));
+      if (keys.length) runHooks("settings", settings, new Set(keys));
     }
     if (ch.users) {
       setUsers(ch.users.newValue);
       if (card) scheduleCardRender();
     }
     updateAllow();
-    if (ch.settings && IS_TOP) {
-      updateChattersBadge(currentChannel());
-      updateWatchBadge(watchChannel());
-    }
+    if (ch.settings && IS_TOP) updateWatchBadge(watchChannel());
     const sig = makeSig();
     if (sig !== signature) {
       signature = sig;
@@ -1083,6 +1098,8 @@
     updateAllow();
     signature = makeSig();
     readyAt = Date.now() + settings.backlogSeconds * 1000;
+    runHooks("settings", settings, null);
+    started = true;
     scanAll();
     new MutationObserver(onMutations).observe(document.documentElement, { childList: true, subtree: true });
     sendStatus();

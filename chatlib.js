@@ -1,0 +1,228 @@
+/* Pure helpers for the chat tools, shared by the background page and the content scripts (and the tests).
+ * Nothing here touches the DOM or the browser APIs. */
+(function (root) {
+  "use strict";
+
+  // ---------- Twitch IRC ----------
+
+  const TAG_ESC = { ":": ";", s: " ", "\\": "\\", r: "\r", n: "\n" };
+
+  function unescapeTag(v) {
+    return String(v).replace(/\\(.?)/g, (m, c) => (c in TAG_ESC ? TAG_ESC[c] : c));
+  }
+
+  // "@a=1;b=2 :nick!user@host CMD #chan :trailing" -> { tags, prefix, nick, command, params[] }
+  function parseIrc(line) {
+    let s = String(line || "").replace(/[\r\n]+$/, "");
+    if (!s) return null;
+    const msg = { tags: {}, prefix: "", nick: "", command: "", params: [] };
+    if (s[0] === "@") {
+      const sp = s.indexOf(" ");
+      if (sp < 0) return null;
+      for (const part of s.slice(1, sp).split(";")) {
+        if (!part) continue;
+        const eq = part.indexOf("=");
+        if (eq < 0) msg.tags[part] = "";
+        else msg.tags[part.slice(0, eq)] = unescapeTag(part.slice(eq + 1));
+      }
+      s = s.slice(sp + 1).replace(/^ +/, "");
+    }
+    if (s[0] === ":") {
+      const sp = s.indexOf(" ");
+      if (sp < 0) return null;
+      msg.prefix = s.slice(1, sp);
+      msg.nick = msg.prefix.split("!")[0].toLowerCase();
+      s = s.slice(sp + 1).replace(/^ +/, "");
+    }
+    const trail = s.indexOf(" :");
+    let head = s;
+    let tail = null;
+    if (trail >= 0) {
+      head = s.slice(0, trail);
+      tail = s.slice(trail + 2);
+    }
+    const parts = head.split(" ").filter(Boolean);
+    msg.command = (parts.shift() || "").toUpperCase();
+    msg.params = parts;
+    if (tail !== null) msg.params.push(tail);
+    return msg.command ? msg : null;
+  }
+
+  // "moderator/1,subscriber/12" -> { moderator: "1", subscriber: "12" }
+  function parseBadges(v) {
+    const out = {};
+    for (const b of String(v || "").split(",")) {
+      const i = b.indexOf("/");
+      if (i > 0) out[b.slice(0, i)] = b.slice(i + 1);
+    }
+    return out;
+  }
+
+  // Turns a parsed IRC line into the small event the content script needs, or null.
+  function ircEvent(m) {
+    if (!m) return null;
+    const chan = String(m.params[0] || "").replace(/^#/, "").toLowerCase();
+    const t = m.tags;
+    const time = Number(t["tmi-sent-ts"]) || Date.now();
+    if (m.command === "PRIVMSG") {
+      let text = m.params[1] || "";
+      let action = false;
+      const me = /^\x01ACTION (.*)\x01?$/.exec(text);
+      if (me) { text = me[1].replace(/\x01$/, ""); action = true; }
+      return {
+        k: "msg", ch: chan, id: t.id || "", login: (t.login || m.nick || "").toLowerCase(),
+        display: t["display-name"] || m.nick, text, action, time,
+        badges: parseBadges(t.badges), color: /^#[0-9a-f]{6}$/i.test(t.color || "") ? t.color : "",
+        first: t["first-msg"] === "1", returning: t["returning-chatter"] === "1",
+        room: t["room-id"] || "", source: t["source-room-id"] || "",
+        reply: t["reply-parent-user-login"] || ""
+      };
+    }
+    if (m.command === "CLEARMSG") {
+      return { k: "del", ch: chan, id: t["target-msg-id"] || "", login: (t.login || "").toLowerCase(), text: m.params[1] || "", time };
+    }
+    if (m.command === "CLEARCHAT") {
+      const target = (m.params[1] || "").toLowerCase();
+      if (!target) return { k: "clear", ch: chan, time };
+      const d = t["ban-duration"];
+      return { k: "ban", ch: chan, login: target, duration: d ? Number(d) || 0 : 0, permanent: !d, time };
+    }
+    if (m.command === "ROOMSTATE" && t["room-id"]) {
+      return { k: "room", ch: chan, room: t["room-id"] };
+    }
+    return null;
+  }
+
+  // ---------- 7TV ----------
+
+  // One 7TV emote-set entry -> { n, id, u (base url), a (animated), z (zero-width), w, h } or null.
+  function sevenTvEmote(e) {
+    if (!e || typeof e !== "object") return null;
+    const name = String(e.name || (e.data && e.data.name) || "");
+    const data = e.data || {};
+    const id = String(data.id || e.id || "");
+    if (!name || name.length > 100 || /\s/.test(name) || !/^[0-9a-z]{1,40}$/i.test(id)) return null;
+    let base = String((data.host && data.host.url) || "");
+    if (base.startsWith("//")) base = "https:" + base;
+    if (!/^https:\/\/cdn\.7tv\.app\/emote\/[0-9a-z]{1,40}$/i.test(base)) base = "https://cdn.7tv.app/emote/" + id;
+    const files = (data.host && Array.isArray(data.host.files) ? data.host.files : []);
+    const one = files.find((f) => f && f.name === "1x.webp") || files[0] || {};
+    const w = Number(one.width) > 0 && Number(one.width) < 1000 ? Number(one.width) : 28;
+    const h = Number(one.height) > 0 && Number(one.height) < 1000 ? Number(one.height) : 28;
+    const zero = ((Number(e.flags) || 0) & 1) !== 0 || ((Number(data.flags) || 0) & 256) !== 0;
+    return { n: name, id, u: base, a: !!data.animated, z: zero, w, h };
+  }
+
+  function sevenTvSet(list) {
+    const out = [];
+    const seen = new Set();
+    for (const e of Array.isArray(list) ? list : []) {
+      const x = sevenTvEmote(e);
+      if (x && !seen.has(x.n)) { seen.add(x.n); out.push(x); }
+    }
+    return out;
+  }
+
+  // ---------- text matching ----------
+
+  function splitList(v) {
+    return String(v || "").split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  // Lines of "word", "two words" or "/regex/flags" -> [{ label, re }]. Invalid regexes are skipped.
+  function compileTerms(v) {
+    const out = [];
+    for (const raw of splitList(v).slice(0, 200)) {
+      const rx = /^\/(.+)\/([a-z]*)$/i.exec(raw);
+      try {
+        if (rx) {
+          const flags = [...new Set((rx[2] + "i").replace(/[^imsu]/g, ""))].join("");
+          out.push({ label: raw, re: new RegExp(rx[1], flags) });
+        } else {
+          const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          out.push({ label: raw, re: new RegExp(`(^|[^\\p{L}\\p{N}_])${esc}(?![\\p{L}\\p{N}_])`, "iu") });
+        }
+      } catch (e) { /* bad regex: ignore */ }
+    }
+    return out;
+  }
+
+  function matchTerms(terms, text) {
+    for (const t of terms) if (t.re.test(text)) return t.label;
+    return null;
+  }
+
+  function loginSet(v) {
+    return new Set(splitList(v).map((s) => s.replace(/^@/, "").toLowerCase()).filter((s) => /^[a-z0-9_]{1,25}$/.test(s)));
+  }
+
+  // Comparable form of a chat message, used to pair a chat row on screen with its IRC message.
+  function msgKey(text) {
+    return String(text || "")
+      .replace(/[​-‍﻿\u{E0000}]/gu, "")
+      .replace(/^@[a-z0-9_]{1,25}\s+/i, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+      .slice(0, 120);
+  }
+
+  // ---------- emote spam detection ----------
+
+  // Feed it the emotes of each chat message; it says when one emote is being spammed by several people.
+  function spamDetector(opts) {
+    const o = { windowMs: 10000, minMessages: 6, minUsers: 4, cooldownMs: 60000, ...opts };
+    const hits = new Map(); // emote -> [{ t, login }]
+    const prompted = new Map(); // emote -> time
+    return {
+      opts: o,
+      add(emotes, login, t = Date.now()) {
+        let fired = null;
+        for (const name of new Set(emotes)) {
+          let arr = hits.get(name);
+          if (!arr) hits.set(name, (arr = []));
+          arr.push({ t, login });
+          while (arr.length && t - arr[0].t > o.windowMs) arr.shift();
+          if (arr.length > 200) arr.splice(0, arr.length - 200);
+          if (arr.length < o.minMessages) continue;
+          const users = new Set(arr.map((x) => x.login)).size;
+          if (users < o.minUsers || (prompted.has(name) && t - prompted.get(name) < o.cooldownMs)) continue;
+          if (!fired || arr.length > fired.count) fired = { name, count: arr.length, users };
+        }
+        if (fired) prompted.set(fired.name, t);
+        if (hits.size > 500) {
+          for (const [k, arr] of hits) if (!arr.length || t - arr[arr.length - 1].t > o.windowMs) hits.delete(k);
+        }
+        return fired;
+      },
+      reset() { hits.clear(); prompted.clear(); }
+    };
+  }
+
+  // ---------- emote usage stats ----------
+
+  // stats: { name: { n, last, src, p } } -> top names by count (ties: most recent first)
+  function topEmotes(stats, limit = 24) {
+    return Object.entries(stats || {})
+      .filter(([, s]) => s && s.n > 0)
+      .sort((a, b) => b[1].n - a[1].n || (b[1].last || 0) - (a[1].last || 0))
+      .slice(0, limit)
+      .map(([name, s]) => ({ name, ...s }));
+  }
+
+  function fmtDuration(sec) {
+    sec = Math.max(0, Math.round(Number(sec) || 0));
+    if (sec < 60) return sec + "s";
+    if (sec < 3600) return Math.round(sec / 60) + "m";
+    if (sec < 86400) return Math.round(sec / 3600) + "h";
+    return Math.round(sec / 86400) + "d";
+  }
+
+  const API = {
+    parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
+    splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration
+  };
+
+  if (typeof module !== "undefined" && module.exports) module.exports = API;
+  else root.TCWChatLib = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);
