@@ -208,7 +208,8 @@ a.tcw-del-link { color: #bf94ff !important; text-decoration: underline dotted; }
 .tcw-notice { padding: 5px 20px; color: #adadb8; font-size: 12px; line-height: 18px; word-break: break-word; }
 html.tw-root--theme-light .tcw-notice { color: #53535f; }
 .tcw-notice b { color: inherit; font-weight: 700; }
-.tcw-notice-ban { color: #ff8f8f; }
+.tcw-notice-ban { color: #ff8f8f; background-color: rgba(235, 4, 0, .24); box-shadow: inset 3px 0 0 #eb0400; }
+html.tw-root--theme-light .tcw-notice-ban { color: #b00000; background-color: rgba(235, 4, 0, .13); }
 .tcw-cleared summary { cursor: pointer; }
 .tcw-cleared-list { max-height: 260px; overflow-y: auto; margin-top: 4px; padding-left: 6px; border-left: 2px solid rgba(127, 127, 127, .3); }
 .tcw-cleared-row { opacity: .8; }

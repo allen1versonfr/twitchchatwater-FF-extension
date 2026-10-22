@@ -7,7 +7,7 @@
   chat was paused), the add-on puts it back where it was, marked "deleted" or "timed out", with links still clickable.
   Follows the "When a message is deleted" setting (show, crossed out, Twitch default, hide).
 - Deleted and timed-out messages now have a **red background** (and a red edge on the left) so they stand out,
-  instead of being faded.
+  instead of being faded. The "has been timed out / banned" lines in chat are red too.
 - **Refresh button** ⟳ in the player's control bar: reloads the stream when it freezes or keeps buffering, without
   reloading the page (VODs keep their position). Turn it off in Chat → Player & audio.
 
