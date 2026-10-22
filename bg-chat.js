@@ -393,6 +393,34 @@ async function onKeyword(msg, sender) {
   return result;
 }
 
+// ---------- start in Twitch tabs that were already open ----------
+// After installing, updating or re-enabling, open Twitch tabs get the add-on right away instead of needing a reload.
+
+async function injectInto(tab) {
+  try {
+    if (await browser.tabs.sendMessage(tab.id, { type: "tcw:ping" }, { frameId: 0 })) return false;
+  } catch (e) { /* not running there yet */ }
+  const cs = (browser.runtime.getManifest().content_scripts || [])[0];
+  if (!cs) return false;
+  try {
+    for (const file of cs.css || []) await browser.tabs.insertCSS(tab.id, { file, allFrames: true });
+    for (const file of cs.js || []) await browser.tabs.executeScript(tab.id, { file, allFrames: true, runAt: "document_idle" });
+    return true;
+  } catch (e) {
+    return false; // unloaded (discarded) tab: it gets the add-on normally when it loads
+  }
+}
+
+async function injectAll() {
+  let tabs = [];
+  try { tabs = await browser.tabs.query({ url: "*://*.twitch.tv/*" }); } catch (e) { return 0; }
+  let n = 0;
+  for (const tab of tabs) if (!tab.discarded && (await injectInto(tab))) n++;
+  return n;
+}
+
+setTimeout(() => injectAll().catch(() => {}), 500);
+
 // ---------- messaging ----------
 
 browser.runtime.onMessage.addListener((msg, sender) => {
@@ -433,6 +461,8 @@ browser.runtime.onMessage.addListener((msg, sender) => {
     case "drops:done":
       if (sender.tab) closeDropTab(sender.tab.id);
       return;
+    case "injectAll":
+      return injectAll();
     case "openPage":
       return browser.tabs.create({ url: browser.runtime.getURL("ui.html#" + (msg.page === "modlog" ? "modlog" : "activity")) }).then(() => true);
     case "drops:checkNow":

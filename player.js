@@ -156,7 +156,12 @@
     if (g) return g;
     if (!ctx) ctx = new AudioContext();
     if (ctx.state !== "running") return null; // never route audio into a context that can't play
-    const src = ctx.createMediaElementSource(vid);
+    let src;
+    try {
+      src = ctx.createMediaElementSource(vid);
+    } catch (e) {
+      return null; // already routed by an earlier copy of the add-on; Twitch gives the next stream a fresh video
+    }
     const mono = ctx.createGain();
     const comp = ctx.createDynamicsCompressor();
     const makeup = ctx.createGain();

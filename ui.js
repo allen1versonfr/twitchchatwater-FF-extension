@@ -416,7 +416,7 @@ async function renderStatus() {
   if (!list || !list.length) {
     box.replaceChildren(h("div", { class: "empty" },
       h("div", { class: "empty-title" }, "No Twitch chat detected"),
-      h("div", {}, "Open a Twitch channel with the chat visible. If one is already open, reload that tab.")
+      h("div", {}, "Open a Twitch channel with the chat visible. If one is already open, press Connect open tabs below.")
     ));
     return;
   }
@@ -453,6 +453,12 @@ function stopStatus() {
 }
 
 function bindStatus() {
+  $("#injectNow").addEventListener("click", async () => {
+    let n = 0;
+    try { n = await send("injectAll"); } catch (e) { /* background starting */ }
+    $("#testMsg").textContent = n ? `Connected ${n} tab${n === 1 ? "" : "s"}.` : "Every open Twitch tab is already connected.";
+    renderStatus();
+  });
   $("#testAlert").addEventListener("click", async () => {
     if (state.settings.sound) playLocal(state.settings.soundType, state.settings.volume);
     let r = {};

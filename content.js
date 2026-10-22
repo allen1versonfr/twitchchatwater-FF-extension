@@ -3,6 +3,10 @@
   if (window.__tcwLoaded) return;
   window.__tcwLoaded = true;
 
+  // After an update the add-on is started again in pages that were already open. Buttons and popups left by the
+  // previous copy no longer respond, so clear them; they're drawn again in a moment.
+  for (const old of document.querySelectorAll("[id^='tcw-'], .tcw-pop-host, .tcw-audio")) old.remove();
+
   // A chat message row, across Twitch's live chat, VOD chat, FrankerFaceZ and 7TV.
   const LINE_SEL = [
     ".chat-line__message",
@@ -1047,6 +1051,7 @@
   browser.runtime.onMessage.addListener((msg) => {
     if (!msg) return;
     if (msg.type === "getContextUser") return Promise.resolve(contextUser);
+    if (msg.type === "tcw:ping") return Promise.resolve(true);
     if (msg.type === "toast") toast(msg.text);
     if (msg.type === "jump") return Promise.resolve(jumpLocal(msg.msgId));
   });

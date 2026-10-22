@@ -7,6 +7,8 @@
 - **Volume boost** up to 400% and **mono**, from a new 🎚 button in the player or the Chat tab.
 - **Better volume control**: scroll over the video (Shift for fine steps), middle-click to mute, on-screen volume, and each channel
   remembers its own volume.
+- **No reloads needed**: Twitch tabs that were already open start working right after installing, updating or re-enabling
+  the add-on (Status → Connect open tabs does it by hand), and turning 7TV emotes off takes them out of chat immediately.
 
 ## 3.0.0
 

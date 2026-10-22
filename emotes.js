@@ -128,6 +128,15 @@
     }
   }
 
+  // Turns shown 7TV emotes back into their names (when 7TV emotes are switched off).
+  function unrender7tv() {
+    for (const wrap of document.querySelectorAll(".tcw-emote-wrap")) {
+      const names = [...wrap.querySelectorAll("img.tcw-emote")].map((i) => i.alt).join(" ");
+      wrap.replaceWith(document.createTextNode(names));
+    }
+    for (const frag of document.querySelectorAll("[data-a-target='chat-message-text'], .text-fragment")) frag.normalize();
+  }
+
   function rerender7tv() {
     for (const line of C.lines()) if (line.isConnected) render7tv(line);
   }
@@ -572,7 +581,12 @@
     }
     if (keys.has("emotes7tv")) {
       if (s.emotes7tv) load7tv(C.currentChannel());
-      else C.toast("Reload the page to remove 7TV emotes already shown");
+      else {
+        seven = { channel: new Map(), global: new Map(), ch: "" };
+        unrender7tv();
+        hideTip();
+        if (menu) renderMenu();
+      }
     }
     if (keys.has("emoteMenu")) ensureButton();
   }

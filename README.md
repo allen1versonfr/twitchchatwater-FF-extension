@@ -14,7 +14,7 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 1. Download this repo and unzip it.
 2. Open `about:debugging#/runtime/this-firefox`.
 3. Click **Load Temporary Add-on…** and pick `manifest.json`.
-4. Reload any Twitch tab that was already open.
+4. Twitch tabs that were already open are connected automatically (no reload needed).
 
 ## Features
 
@@ -168,7 +168,7 @@ Chat messages, your activity history, your watch time, your emote usage and the 
 
 ## If nothing happens
 
-1. Open the **Status** tab. If it says "No Twitch chat detected", reload the Twitch tab.
+1. Open the **Status** tab. If it says "No Twitch chat detected", press **Connect open tabs** (or reload the Twitch tab).
 2. Make sure the top switch is on and the person's switch is on.
 3. If **Only these channels** has anything in it, the channel you're on must be listed.
 4. Messages in the first few seconds after opening a channel are treated as history and don't beep
