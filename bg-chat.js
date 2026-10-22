@@ -4,7 +4,7 @@
  * - One read-only, anonymous connection to Twitch chat (IRC over WebSocket, like any logged-out viewer),
  *   joined to the channels open in Twitch tabs. It's how the add-on learns about deleted messages, bans,
  *   timeouts, chat clears, first-time chatters and shared chat. Events are batched to the tabs showing that channel.
- * - 7TV emote lists (channel + global), cached here for every tab.
+ * - Channel ids for the emote providers (7TV, BTTV, FFZ live in bg-emotes.js).
  * - Moderation log, emote usage, favorites and auto-claim counters (storage.local only).
  */
 
@@ -72,7 +72,7 @@ const irc = {
   async sync() {
     const { settings } = await load();
     this.enabled = !!settings.ircOn;
-    this.emotes7tv = !!settings.emotes7tv;
+    this.emotes7tv = !!(settings.emotes7tv || settings.emotesBttv || settings.emotesFfz);
     const want = this.enabled ? wantedChannels() : new Set();
     if (!want.size) {
       if (this.ws) this.close();
@@ -154,7 +154,7 @@ const irc = {
     if (!ev || !ev.ch) return;
     if (ev.k === "room") {
       roomIds.set(ev.ch, ev.room);
-      if (this.emotes7tv) ensure7tv(ev.ch);
+      if (this.emotes7tv) ensureEmotes(ev.ch);
     }
     if (ev.k === "ban" || ev.k === "del" || ev.k === "clear") logModEvent(ev);
     deliver(ev.ch, ev);
@@ -199,12 +199,9 @@ function flushModLog() {
   });
 }
 
-// ---------- 7TV emotes ----------
+// ---------- channel ids (used by the emote providers in bg-emotes.js) ----------
 
 const roomIds = new Map(); // channel -> Twitch user id
-const sevenTv = new Map(); // channel -> { emotes, t } | Promise
-let sevenGlobal = null; // { emotes, t }
-const SEVEN_TTL = 15 * 60 * 1000;
 
 async function getJson(url, opts = {}) {
   const ctl = new AbortController();
@@ -234,47 +231,6 @@ async function roomIdFor(channel) {
   return roomIds.get(channel) || "";
 }
 
-async function globalEmotes() {
-  if (sevenGlobal && Date.now() - sevenGlobal.t < 60 * 60 * 1000) return sevenGlobal.emotes;
-  try {
-    const d = await getJson("https://7tv.io/v3/emote-sets/global");
-    sevenGlobal = { emotes: L.sevenTvSet(d && d.emotes), t: Date.now() };
-  } catch (e) {
-    if (!sevenGlobal) return [];
-  }
-  return sevenGlobal.emotes;
-}
-
-function ensure7tv(channel) {
-  const c = sevenTv.get(channel);
-  if (c && (c.then || Date.now() - c.t < SEVEN_TTL)) return c.then ? c : Promise.resolve(c);
-  const job = (async () => {
-    let emotes = [];
-    try {
-      const room = await roomIdFor(channel);
-      if (room) {
-        const d = await getJson("https://7tv.io/v3/users/twitch/" + room);
-        emotes = L.sevenTvSet(d && d.emote_set && d.emote_set.emotes);
-      }
-    } catch (e) {
-      console.warn("[Chat Watcher] 7TV lookup failed for", channel, e);
-    }
-    const global = await globalEmotes();
-    const rec = { emotes, global, room: roomIds.get(channel) || "", t: Date.now() };
-    sevenTv.set(channel, rec);
-    if (sevenTv.size > 50) sevenTv.delete(sevenTv.keys().next().value);
-    for (const s of chatSubs.values()) {
-      if (s.channel === channel) {
-        browser.tabs.sendMessage(s.tabId, { type: "emotes:7tv", channel, ...rec }, { frameId: s.frameId }).catch(() => {});
-      }
-    }
-    return rec;
-  })();
-  sevenTv.set(channel, job);
-  job.catch(() => sevenTv.delete(channel));
-  return job;
-}
-
 // ---------- emote usage, recent and favorites ----------
 
 function cleanEmote(e) {
@@ -282,8 +238,8 @@ function cleanEmote(e) {
   const name = String(e.name || "").slice(0, 100);
   const src = String(e.src || "");
   if (!name || /\s/.test(name)) return null;
-  if (src && !/^https:\/\/(static-cdn\.jtvnw\.net|cdn\.7tv\.app)\//i.test(src)) return null;
-  return { name, src, p: e.p === "7tv" ? "7tv" : "twitch" };
+  if (src && !/^https:\/\/(static-cdn\.jtvnw\.net|cdn\.7tv\.app|cdn\.betterttv\.net|cdn\.frankerfacez\.com)\//i.test(src)) return null;
+  return { name, src, p: ["7tv", "bttv", "ffz"].includes(e.p) ? e.p : "twitch" };
 }
 
 async function emotesUsed(list) {
@@ -441,11 +397,6 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return;
     case "irc:state":
       return Promise.resolve({ connected: !!irc.ready, channels: [...irc.joined] });
-    case "emotes:get": {
-      const channel = String(msg.channel || "").toLowerCase();
-      if (!CH_RE.test(channel)) return Promise.resolve(null);
-      return load().then(({ settings }) => (settings.emotes7tv ? ensure7tv(channel) : null)).catch(() => null);
-    }
     case "emotes:used":
       return serial(() => emotesUsed(msg.emotes));
     case "emotes:fav":

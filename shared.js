@@ -40,6 +40,10 @@ var TCW = (() => {
     // chat tools
     ircOn: true,               // read-only, anonymous connection to Twitch chat (deleted messages, bans, first-time chatters)
     emotes7tv: true,           // show 7TV emotes (channel + global) in chat
+    emotesBttv: true,          // show BTTV emotes
+    emotesFfz: true,           // show FFZ emotes
+    emotesPersonal: true,      // show 7TV subscribers' personal emotes on their messages
+    emoteLive: true,           // live emote updates (7TV, BTTV; FFZ every 10 min) with a line in chat
     emoteMenu: true,           // emote button next to the chat box (favorites, recent, most used, 7TV)
     emoteColon: true,          // ":kek" suggestions while typing
     emoteTab: true,            // Tab cycles through matching emotes

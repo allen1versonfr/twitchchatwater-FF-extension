@@ -761,5 +761,5 @@
   setInterval(ensureButton, 2000);
   setTimeout(subscribe, 1500);
 
-  C.tools = { isMod, markDeleted, modAction };
+  C.tools = { isMod, markDeleted, modAction, notice: (text) => appendNotice(el("div", { class: "tcw-notice tcw-notice-emote" }, text)) };
 })();

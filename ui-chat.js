@@ -50,7 +50,7 @@ function renderEmoteStats() {
     ? `${total} emote${total === 1 ? "" : "s"} sent · ${chatUI.emoteFavs.length} favorite${chatUI.emoteFavs.length === 1 ? "" : "s"}`
     : `Your most used emotes show up here once you chat · ${chatUI.emoteFavs.length} favorite${chatUI.emoteFavs.length === 1 ? "" : "s"}`;
   $("#emoteTop").replaceChildren(...top.map((e) => h("span", { class: "emote-chip", title: `${e.name} · used ${e.n}×` },
-    /^https:\/\/(static-cdn\.jtvnw\.net|cdn\.7tv\.app)\//.test(e.src || "") ? h("img", { src: e.src, alt: "", referrerpolicy: "no-referrer" }) : null,
+    /^https:\/\/(static-cdn\.jtvnw\.net|cdn\.7tv\.app|cdn\.betterttv\.net|cdn\.frankerfacez\.com)\//.test(e.src || "") ? h("img", { src: e.src, alt: "", referrerpolicy: "no-referrer" }) : null,
     h("span", {}, e.name), h("small", {}, String(e.n)))));
 }
 

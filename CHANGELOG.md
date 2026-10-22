@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.2.0
+
+- **BTTV and FFZ emotes** in chat, the emote menu, `:` suggestions and Tab completion, next to 7TV's
+  (channel emotes win over global ones on a name clash: 7TV, then BTTV, then FFZ).
+- **7TV personal emotes**: 7TV subscribers' personal emotes show on their messages.
+- **Live emote updates**: added, removed and renamed 7TV and BTTV emotes change right away (FFZ within 10 minutes),
+  with a line in chat saying what changed. Removed emotes turn back into text.
+- Each provider can be switched on or off without reloading.
+
 ## 3.1.0
 
 - **Stream delay** (⏳) next to the viewer count and watch time, colored by how far behind live you are. Click it to catch up.

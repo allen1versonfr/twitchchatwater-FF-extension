@@ -110,7 +110,7 @@
     const w = Number(one.width) > 0 && Number(one.width) < 1000 ? Number(one.width) : 28;
     const h = Number(one.height) > 0 && Number(one.height) < 1000 ? Number(one.height) : 28;
     const zero = ((Number(e.flags) || 0) & 1) !== 0 || ((Number(data.flags) || 0) & 256) !== 0;
-    return { n: name, id, u: base, a: !!data.animated, z: zero, w, h };
+    return { n: name, id, p: "7tv", u: base, s: [base + "/1x.webp", base + "/2x.webp", base + "/4x.webp"], a: !!data.animated, z: zero, w, h };
   }
 
   function sevenTvSet(list) {
@@ -121,6 +121,109 @@
       if (x && !seen.has(x.n)) { seen.add(x.n); out.push(x); }
     }
     return out;
+  }
+
+  // ---------- BTTV ----------
+
+  // BTTV's global overlay emotes (drawn on top of the emote before them)
+  const BTTV_ZERO_WIDTH = new Set(["SoSnowy", "IceCold", "SantaHat", "TopHat", "ReinDeer", "CandyCane", "cvMask", "cvHazmat"]);
+
+  function bttvEmote(e) {
+    if (!e || typeof e !== "object") return null;
+    const id = String(e.id || "");
+    const name = String(e.code || "");
+    if (!/^[0-9a-f]{24}$/i.test(id) || !name || name.length > 100 || /\s/.test(name)) return null;
+    const base = "https://cdn.betterttv.net/emote/" + id;
+    const num = (v) => (Number(v) > 0 && Number(v) < 1000 ? Number(v) : 0);
+    return {
+      n: name, id, p: "bttv", s: [base + "/1x.webp", base + "/2x.webp", base + "/3x.webp"],
+      a: !!e.animated || e.imageType === "gif", z: BTTV_ZERO_WIDTH.has(name), w: num(e.width) || 28, h: num(e.height) || 28
+    };
+  }
+
+  // ---------- FFZ ----------
+
+  function ffzEmote(e) {
+    if (!e || typeof e !== "object" || e.modifier) return null; // modifiers change other emotes; not shown on their own
+    const id = String(e.id == null ? "" : e.id);
+    const name = String(e.name || "");
+    if (!/^\d{1,12}$/.test(id) || !name || name.length > 100 || /\s/.test(name)) return null;
+    const urls = e.urls && typeof e.urls === "object" ? e.urls : {};
+    const base = "https://cdn.frankerfacez.com/emote/" + id + "/";
+    const size = (n) => base + (urls[n] ? n : urls["2"] ? "2" : "1");
+    const num = (v) => (Number(v) > 0 && Number(v) < 1000 ? Number(v) : 0);
+    return { n: name, id, p: "ffz", s: [base + "1", size("2"), urls["4"] ? base + "4" : size("2")], a: false, z: false, w: num(e.width) || 28, h: num(e.height) || 28 };
+  }
+
+  // FFZ answers with { sets: { id: { emoticons: [...] } } }; only the given set ids are used when listed.
+  function ffzSets(data, onlyIds) {
+    const out = [];
+    const sets = data && data.sets && typeof data.sets === "object" ? data.sets : {};
+    for (const [id, set] of Object.entries(sets)) {
+      if (onlyIds && !onlyIds.map(String).includes(String(id))) continue;
+      for (const e of (set && Array.isArray(set.emoticons) ? set.emoticons : [])) {
+        const x = ffzEmote(e);
+        if (x) out.push(x);
+      }
+    }
+    return out;
+  }
+
+  // ---------- merging and live updates ----------
+
+  // Lists in priority order -> one list, first one wins on a name clash.
+  function mergeEmotes(...lists) {
+    const seen = new Set();
+    const out = [];
+    for (const list of lists) {
+      for (const e of list || []) {
+        if (e && !seen.has(e.n)) { seen.add(e.n); out.push(e); }
+      }
+    }
+    return out;
+  }
+
+  // Applies a 7TV EventAPI "emote_set.update" body to a list -> { list, added: [names], removed: [names] }.
+  function apply7tvChange(list, body) {
+    let next = (list || []).slice();
+    const added = [];
+    const removed = [];
+    const items = (k) => (Array.isArray(body && body[k]) ? body[k] : []).filter((x) => x && x.key === "emotes");
+    for (const x of items("pulled")) {
+      const old = x.old_value;
+      if (!old) continue;
+      const before = next.length;
+      next = next.filter((e) => e.id !== String((old.data && old.data.id) || old.id) && e.n !== old.name);
+      if (next.length < before) removed.push(old.name);
+    }
+    for (const x of items("updated")) {
+      const e = sevenTvEmote(x.value);
+      const old = x.old_value || {};
+      if (!e) continue;
+      next = next.filter((y) => y.n !== old.name && y.id !== e.id);
+      next.push(e);
+      if (old.name && old.name !== e.n) { removed.push(old.name); added.push(e.n); }
+    }
+    for (const x of items("pushed")) {
+      const e = sevenTvEmote(x.value);
+      if (!e) continue;
+      next = next.filter((y) => y.n !== e.n);
+      next.push(e);
+      added.push(e.n);
+    }
+    return { list: next, added, removed };
+  }
+
+  // 7TV entitlement event -> { kind, ref, login } (who owns which personal emote set), or null.
+  function sevenEntitlement(body) {
+    const o = body && (body.object || body);
+    if (!o || typeof o !== "object") return null;
+    const user = o.user || {};
+    const conn = (Array.isArray(user.connections) ? user.connections : []).find((c) => c && String(c.platform).toUpperCase() === "TWITCH");
+    const login = conn ? String(conn.username || "").toLowerCase() : "";
+    const ref = String(o.ref_id || "");
+    if (!/^[a-z0-9_]{1,25}$/.test(login) || !/^[0-9a-z]{1,40}$/i.test(ref)) return null;
+    return { kind: String(o.kind || "").toUpperCase(), ref, login };
   }
 
   // ---------- text matching ----------
@@ -220,6 +323,7 @@
 
   const API = {
     parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
+    bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
     splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration
   };
 

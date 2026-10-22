@@ -355,3 +355,4 @@ html.tw-root--theme-light .tcw-watch.tcw-delay { background: rgba(0, 173, 3, .16
 .tcw-audio-meter { flex: 1; height: 6px; background: #2f2f35; border-radius: 3px; overflow: hidden; }
 .tcw-audio-meter span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00ad03, #ffb300, #eb0400); transition: width .15s; }
 .tcw-audio-note { color: #adadb8; font-size: 11px; margin-top: 4px; }
+.tcw-notice-emote { color: #bf94ff; }

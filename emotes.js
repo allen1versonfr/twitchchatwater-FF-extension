@@ -1,4 +1,5 @@
-/* Emotes: 7TV emotes in chat, the emote menu (favorites, recent, most used, popular in chat, 7TV),
+/* Emotes: 7TV, BTTV and FFZ emotes in chat (incl. 7TV personal emotes and live updates), the emote menu
+ * (favorites, recent, most used, popular in chat, channel and global emotes),
  * ":" suggestions, Tab completion carousel, emote-spam "join in" button and Up/Down message history. */
 (() => {
   "use strict";
@@ -11,7 +12,8 @@
   const TWITCH_EMOTE_SEL = "img.chat-line__message--emote, img.chat-image:not(.chat-badge), .chat-line__message--emote-button img";
   const SEVEN_SKIP_SEL = "a, .mention-fragment, [data-a-target='chat-message-mention'], .tcw-emote-wrap, .tcw-recovered";
 
-  let seven = { channel: new Map(), global: new Map(), ch: "" };
+  let seven = { channel: new Map(), global: new Map(), ch: "" }; // all providers, despite the name
+  let personal = new Map(); // twitch login -> Map(name -> emote)   (7TV personal emotes)
   let favs = [];
   let recent = [];
   let stats = {};
@@ -26,12 +28,21 @@
 
   // ---------- catalog ----------
 
-  function sevenGet(name) {
-    return seven.channel.get(name) || seven.global.get(name) || null;
+  const PROVIDER = { "7tv": "7TV", bttv: "BTTV", ffz: "FFZ" };
+
+  // Channel emotes win, then the sender's personal 7TV emotes, then global ones.
+  function sevenGet(name, login) {
+    const own = login && personal.get(login);
+    return seven.channel.get(name) || (own && own.get(name)) || seven.global.get(name) || null;
   }
 
   function sevenSrc(e, size = 1) {
+    if (Array.isArray(e.s)) return e.s[size <= 1 ? 0 : size <= 2 ? 1 : 2];
     return `${e.u}/${size}x.webp`;
+  }
+
+  function providerOf(e) {
+    return e.p || "7tv";
   }
 
   function favSet() {
@@ -43,8 +54,10 @@
     const out = new Map();
     const add = (name, src, p, tag) => { if (name && !out.has(name)) out.set(name, { name, src, p, tag }); };
     for (const f of favs) add(f.name, f.src, f.p, "★");
-    for (const e of seven.channel.values()) add(e.n, sevenSrc(e), "7tv", "7TV");
-    for (const e of seven.global.values()) add(e.n, sevenSrc(e), "7tv", "7TV global");
+    for (const e of seven.channel.values()) add(e.n, sevenSrc(e), providerOf(e), PROVIDER[providerOf(e)]);
+    const mine = personal.get(C.myLogin());
+    if (mine) for (const e of mine.values()) add(e.n, sevenSrc(e), "7tv", "7TV personal");
+    for (const e of seven.global.values()) add(e.n, sevenSrc(e), providerOf(e), PROVIDER[providerOf(e)] + " global");
     for (const [n, s] of Object.entries(stats)) add(n, s.src, s.p, "used");
     for (const [n, src] of twitchSeen) add(n, src, "twitch", "seen in chat");
     return out;
@@ -69,17 +82,21 @@
     return scored.slice(0, limit).map((x) => x.e);
   }
 
-  // ---------- 7TV in chat ----------
+  // ---------- 7TV / BTTV / FFZ in chat ----------
+
+  function anyProvider() {
+    return S().emotes7tv || S().emotesBttv || S().emotesFfz;
+  }
 
   function sevenActive() {
-    return S().emotes7tv && (seven.channel.size || seven.global.size) && !document.querySelector(".seventv-chat-list, .seventv-message");
+    return anyProvider() && (seven.channel.size || seven.global.size || personal.size) && !document.querySelector(".seventv-chat-list, .seventv-message");
   }
 
   function emoteNode(e) {
     const img = el("img", {
       class: "tcw-emote", alt: e.n, src: sevenSrc(e, 1), srcset: `${sevenSrc(e, 1)} 1x, ${sevenSrc(e, 2)} 2x, ${sevenSrc(e, 4)} 4x`,
       loading: "lazy", decoding: "async", referrerpolicy: "no-referrer", draggable: "false",
-      "data-tcw-p": "7tv", "data-tcw-zw": e.z ? "1" : null
+      "data-tcw-p": providerOf(e), "data-tcw-zw": e.z ? "1" : null
     });
     img.style.setProperty("--tcw-ew", e.w + "px");
     img.style.setProperty("--tcw-eh", e.h + "px");
@@ -95,6 +112,7 @@
 
   function render7tv(line) {
     if (!sevenActive() || line.closest(".seventv-message")) return;
+    const login = C.loginOf(line);
     for (const frag of textFragments(line)) {
       const walker = document.createTreeWalker(frag, NodeFilter.SHOW_TEXT);
       const nodes = [];
@@ -102,12 +120,12 @@
       while ((n = walker.nextNode())) if (!n.parentElement.closest(SEVEN_SKIP_SEL)) nodes.push(n);
       for (const node of nodes) {
         const parts = node.data.split(/(\s+)/);
-        if (!parts.some((p) => p && sevenGet(p))) continue;
+        if (!parts.some((p) => p && sevenGet(p, login))) continue;
         const out = document.createDocumentFragment();
         let lastEmote = null;
         let buf = "";
         for (const p of parts) {
-          const e = p && !/^\s+$/.test(p) ? sevenGet(p) : null;
+          const e = p && !/^\s+$/.test(p) ? sevenGet(p, login) : null;
           if (!e) {
             buf += p;
             if (p && !/^\s+$/.test(p)) lastEmote = null;
@@ -128,22 +146,26 @@
     }
   }
 
-  // Turns shown 7TV emotes back into their names (when 7TV emotes are switched off).
-  function unrender7tv() {
+  // Turns shown emotes back into their names (when a provider is switched off or an emote removed).
+  function unrender7tv(onlyLogin) {
     for (const wrap of document.querySelectorAll(".tcw-emote-wrap")) {
+      if (onlyLogin) {
+        const line = C.findChatRow(wrap);
+        if (!line || C.loginOf(line) !== onlyLogin) continue;
+      }
       const names = [...wrap.querySelectorAll("img.tcw-emote")].map((i) => i.alt).join(" ");
       wrap.replaceWith(document.createTextNode(names));
     }
     for (const frag of document.querySelectorAll("[data-a-target='chat-message-text'], .text-fragment")) frag.normalize();
   }
 
-  function rerender7tv() {
-    for (const line of C.lines()) if (line.isConnected) render7tv(line);
+  function rerender7tv(onlyLogin) {
+    for (const line of C.lines()) if (line.isConnected && (!onlyLogin || C.loginOf(line) === onlyLogin)) render7tv(line);
   }
 
   async function load7tv(ch) {
     seven = { channel: new Map(), global: seven.global, ch };
-    if (!ch || !S().emotes7tv) return;
+    if (!ch || !anyProvider()) return;
     try {
       const r = await browser.runtime.sendMessage({ type: "emotes:get", channel: ch });
       if (r) apply7tv(ch, r);
@@ -152,14 +174,48 @@
 
   function apply7tv(ch, r) {
     if (ch !== C.currentChannel()) return;
+    const before = seven;
     seven = {
       ch,
       channel: new Map((r.emotes || []).map((e) => [e.n, e])),
       global: new Map((r.global || []).map((e) => [e.n, e]))
     };
-    C.debug("7TV emotes", ch, seven.channel.size, "channel,", seven.global.size, "global");
+    if (r.personal && typeof r.personal === "object") {
+      personal = new Map(Object.entries(r.personal).map(([login, list]) => [login, new Map((list || []).map((e) => [e.n, e]))]));
+    }
+    C.debug("emotes", ch, seven.channel.size, "channel,", seven.global.size, "global,", personal.size, "personal sets");
+    // an emote that's gone (or now means something else) goes back to plain text first
+    const gone = [...before.channel.keys(), ...before.global.keys()].some((n) => !seven.channel.has(n) && !seven.global.has(n));
+    if (gone && before.ch === ch) unrender7tv();
     rerender7tv();
     if (menu) renderMenu();
+    if (Array.isArray(r.changes) && r.changes.length && S().emoteLive) announce(r.changes);
+  }
+
+  function applyPersonal(login, list) {
+    if (!/^[a-z0-9_]{1,25}$/.test(login || "")) return;
+    const had = personal.has(login);
+    if (list && list.length) {
+      personal.delete(login);
+      personal.set(login, new Map(list.map((e) => [e.n, e])));
+      if (personal.size > 1000) personal.delete(personal.keys().next().value);
+    } else {
+      personal.delete(login);
+    }
+    if (had) unrender7tv(login);
+    rerender7tv(login);
+  }
+
+  // "7TV: added catJAM · removed KEKW" as a line in chat
+  function announce(changes) {
+    const bits = [];
+    for (const c of changes.slice(0, 3)) {
+      const parts = [];
+      if (c.added && c.added.length) parts.push("added " + c.added.slice(0, 8).join(", ") + (c.added.length > 8 ? ` +${c.added.length - 8}` : ""));
+      if (c.removed && c.removed.length) parts.push("removed " + c.removed.slice(0, 8).join(", ") + (c.removed.length > 8 ? ` +${c.removed.length - 8}` : ""));
+      if (parts.length) bits.push(`${c.p}: ${parts.join(" · ")}`);
+    }
+    if (bits.length && C.tools && C.tools.notice) C.tools.notice("🆕 " + bits.join("  |  "));
   }
 
   // ---------- emotes in a message ----------
@@ -170,7 +226,7 @@
       if (img.closest(".chat-badge, [data-a-target='chat-badge'], .tcw-recovered")) continue;
       const name = (img.getAttribute("alt") || "").trim();
       if (!name || /\s/.test(name) || name.length > 100) continue;
-      const p = img.classList.contains("tcw-emote") ? "7tv" : "twitch";
+      const p = img.classList.contains("tcw-emote") ? img.dataset.tcwP || "7tv" : "twitch";
       out.push({ name, src: httpsSrc(img.getAttribute("src")), p });
     }
     return out;
@@ -338,8 +394,18 @@
       sections.push(["top", "Your most used", L.topEmotes(stats, 24).map((s) => ({ ...s, tag: `used ${s.n}×` }))]);
       sections.push(["popular", "Popular in this chat", [...popular].sort((a, b) => b[1].n - a[1].n).slice(0, 24)
         .map(([name, s]) => ({ name, src: s.src, p: s.p, tag: `${s.n}× since you opened the channel` }))]);
-      sections.push(["7tv", ch ? `7TV · ${ch}` : "7TV channel", [...seven.channel.values()].map((e) => ({ name: e.n, src: sevenSrc(e), p: "7tv", tag: "7TV" }))]);
-      sections.push(["7tvg", "7TV global", [...seven.global.values()].map((e) => ({ name: e.n, src: sevenSrc(e), p: "7tv", tag: "7TV global" }))]);
+      const mine = personal.get(C.myLogin());
+      if (mine && mine.size) sections.push(["7tvp", "Your 7TV personal emotes", [...mine.values()].map((e) => ({ name: e.n, src: sevenSrc(e), p: "7tv", tag: "7TV personal" }))]);
+      for (const p of ["7tv", "bttv", "ffz"]) {
+        const label = PROVIDER[p];
+        sections.push([p, ch ? `${label} · ${ch}` : `${label} channel`, [...seven.channel.values()].filter((e) => providerOf(e) === p)
+          .map((e) => ({ name: e.n, src: sevenSrc(e), p, tag: label }))]);
+      }
+      for (const p of ["7tv", "bttv", "ffz"]) {
+        const label = PROVIDER[p];
+        sections.push([p + "g", `${label} global`, [...seven.global.values()].filter((e) => providerOf(e) === p)
+          .map((e) => ({ name: e.n, src: sevenSrc(e), p, tag: label + " global" }))]);
+      }
     }
     const keep = menu.list.scrollTop;
     menu.list.replaceChildren(...sections.map(([id, title, items]) => {
@@ -496,13 +562,17 @@
 
   function showTip(img) {
     const name = img.alt;
-    const e = sevenGet(name);
+    const row = C.findChatRow(img);
+    const login = row ? C.loginOf(row) : "";
+    const e = sevenGet(name, login);
     if (!e) return;
+    const label = PROVIDER[providerOf(e)];
+    const where = seven.channel.get(name) === e ? "channel emote" : seven.global.get(name) === e ? "global emote" : `personal emote of ${login}`;
     const h = host("tcw-tip-host");
     const box = el("div", { class: "tcw-etip" },
       el("img", { src: sevenSrc(e, 3), alt: "", referrerpolicy: "no-referrer" }),
       el("b", {}, name),
-      el("small", {}, (seven.channel.has(name) ? "7TV channel emote" : "7TV global emote") + (e.z ? " · zero-width" : "")),
+      el("small", {}, `${label} ${where}` + (e.z ? " · zero-width" : "")),
       el("small", { class: "tcw-etip-hint" }, "Right-click → Favorite emote"));
     h.replaceChildren(box);
     const r = img.getBoundingClientRect();
@@ -533,13 +603,14 @@
     if (!t || t.tagName !== "IMG") return;
     if (!(t.classList.contains("tcw-emote") || t.matches(TWITCH_EMOTE_SEL) || (t.closest(C.LINE_SEL) && !t.closest(".chat-badge")))) return;
     const name = (t.getAttribute("alt") || "").trim();
-    if (name && !/\s/.test(name)) contextEmote = { name, src: httpsSrc(t.getAttribute("src")), p: t.classList.contains("tcw-emote") ? "7tv" : "twitch" };
+    if (name && !/\s/.test(name)) contextEmote = { name, src: httpsSrc(t.getAttribute("src")), p: t.classList.contains("tcw-emote") ? t.dataset.tcwP || "7tv" : "twitch" };
   }, true);
 
   browser.runtime.onMessage.addListener((msg) => {
     if (!msg) return;
     if (msg.type === "getContextEmote") return Promise.resolve(contextEmote);
-    if (msg.type === "emotes:7tv") apply7tv(msg.channel, msg);
+    if (msg.type === "emotes:set") apply7tv(msg.channel, msg);
+    if (msg.type === "emotes:personal") applyPersonal(msg.login, msg.emotes);
   });
 
   // ---------- wiring ----------
@@ -579,14 +650,14 @@
       ensureButton();
       return;
     }
-    if (keys.has("emotes7tv")) {
-      if (s.emotes7tv) load7tv(C.currentChannel());
-      else {
-        seven = { channel: new Map(), global: new Map(), ch: "" };
-        unrender7tv();
-        hideTip();
-        if (menu) renderMenu();
-      }
+    if (["emotes7tv", "emotesBttv", "emotesFfz", "emotesPersonal"].some((k) => keys.has(k))) {
+      // start over with only the providers that are on (no reload needed)
+      seven = { channel: new Map(), global: new Map(), ch: "" };
+      personal = new Map();
+      unrender7tv();
+      hideTip();
+      if (menu) renderMenu();
+      load7tv(C.currentChannel());
     }
     if (keys.has("emoteMenu")) ensureButton();
   }
@@ -601,6 +672,11 @@
   window.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu) closeMenu(); });
   window.addEventListener("resize", () => { closeSug(); closeMenu(); });
   setInterval(ensureButton, 2000);
+  // keeps live emote updates coming for this channel (and picks up FFZ changes every 10 minutes)
+  setInterval(() => {
+    const ch = C.currentChannel();
+    if (ch && anyProvider() && document.querySelector(C.CONTAINER_SEL)) browser.runtime.sendMessage({ type: "emotes:get", channel: ch }).catch(() => {});
+  }, 60000);
 
   C.emotes = { search, catalog, sevenGet, lineEmotes };
 })();
