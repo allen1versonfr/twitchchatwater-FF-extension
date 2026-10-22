@@ -44,8 +44,8 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 ## Player and audio
 
 In **Chat → Player & audio**, and from the 🎚 button in the player controls:
-- **Stream delay** (⏳) next to the viewer count and your watch time: how far behind the streamer you are, from Twitch's own
-  player (or the buffer size if the player doesn't say). Green under 4 s, yellow under 8 s, red above. Click it to jump closer to live.
+- **Stream delay** (⏳) in the player's control bar and next to the viewer count and your watch time: how far behind the
+  streamer you are, from Twitch's own player (or its Video Stats, or the buffer size if neither says). Green under 4 s, yellow under 8 s, red above. Click it to jump closer to live.
 - **Audio compressor**, a reworked version of 7TV's: three presets (light, medium like 7TV, strong "night mode") with matching
   makeup gain, plus a limiter so nothing clips, and a live meter of how much it's compressing.
 - **Volume boost** up to 400% for quiet streams, and **mono**.
