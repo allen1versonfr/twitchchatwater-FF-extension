@@ -186,7 +186,13 @@ html.tcw-fs img.tcw-emote { height: calc(var(--tcw-fs) * 2); }
 .tcw-del.tcw-del-hide { display: none !important; }
 .tcw-del.tcw-del-strike [data-a-target='chat-line-message-body'],
 .tcw-del.tcw-del-strike .tcw-recovered { text-decoration: line-through; }
-.tcw-del.tcw-del-show, .tcw-del.tcw-del-strike { opacity: .7; }
+/* deleted and timed-out messages: a red background so they stand out (wins over word and badge highlights) */
+.tcw-del.tcw-del-show, .tcw-del.tcw-del-strike {
+  background-color: rgba(235, 4, 0, .24) !important; box-shadow: inset 3px 0 0 #eb0400;
+}
+html.tw-root--theme-light .tcw-del.tcw-del-show, html.tw-root--theme-light .tcw-del.tcw-del-strike {
+  background-color: rgba(235, 4, 0, .13) !important;
+}
 .tcw-recovered { color: #adadb8; font-style: italic; margin-left: 4px; word-break: break-word; }
 html.tw-root--theme-light .tcw-recovered { color: #53535f; }
 .tcw-rec-tag {

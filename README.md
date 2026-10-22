@@ -92,7 +92,7 @@ Everything here can be turned on or off in the **Chat** tab.
 
 **Deleted messages and links**
 - When a moderator deletes a message or times someone out, the add-on shows what it said (crossed out if you like),
-  with links still clickable. Or hide deleted messages completely, or leave it to Twitch.
+  on a red background, with links still clickable. Or hide deleted messages completely, or leave it to Twitch.
 - If Twitch takes the message out of chat entirely, or never showed it (deleted within a split second, or while chat
   was paused), it's put back where it was, marked "deleted" or "timed out".
 - This only works for messages the tab saw before they were removed (it can't recover anything from before you opened the channel).
