@@ -290,7 +290,10 @@ html.tw-root--theme-light .tcw-tb-btn { color: #0e0e10; }
 .tcw-sug-tab .tcw-sug-hint { width: 100%; }
 
 /* emote spam */
-.tcw-spam { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-color: #9147ff; animation: tcw-in .2s ease-out; }
+.tcw-spam { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-color: #9147ff; animation: tcw-in .2s ease-out; }
+.tcw-spam-row { display: flex; align-items: center; gap: 10px; }
+.tcw-spam-row + .tcw-spam-row { border-top: 1px solid #3a3a3d; padding-top: 6px; }
+.tcw-spam .tcw-btn:disabled { opacity: .5; cursor: default; }
 .tcw-spam-img { height: 32px; width: auto; max-width: 80px; }
 .tcw-spam-txt { flex: 1; min-width: 0; }
 .tcw-spam-txt b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

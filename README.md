@@ -76,7 +76,9 @@ Everything here can be turned on or off in the **Chat** tab.
 - **`:` suggestions**: type `:kek` to see matching emotes; ↑/↓ to pick, Tab or Enter to insert.
 - **Tab completion carousel**: type part of an emote name and press Tab; keep pressing Tab (or Shift+Tab) to cycle through the matches.
 - **Join in on emote spam**: when several people spam the same emote (6 messages from 4 people within 10 seconds, adjustable),
-  a button pops up above the chat box that sends that emote for you. Nothing is ever sent without your click.
+  a button pops up above the chat box that sends that emote for you. Up to 3 spammed emotes show at once, and you can press
+  Send as many times as you like (repeats get an invisible character so Twitch doesn't block them as duplicates).
+  Nothing is ever sent without your click.
 - **Message history**: ↑/↓ in an empty chat box brings back the messages you sent in this tab.
 
 **Highlights, filters and appearance**

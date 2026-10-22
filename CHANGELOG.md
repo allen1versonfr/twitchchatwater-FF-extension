@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.4.0
+
+- **Join in on emote spam** now shows up to **3 emotes** at once (newest on top), each with its own Send button.
+- **Send as often as you like**: the button stays after you press it and counts how many times you sent it.
+  Repeats get an invisible character at the end so Twitch doesn't block them as duplicate messages.
+  The box closes 12 seconds after the last spam or click.
+
 ## 3.3.0
 
 - **Deleted messages Twitch removes from chat come back**: when a moderator deletes a message or times someone out and
