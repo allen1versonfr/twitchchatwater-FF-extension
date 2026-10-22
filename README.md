@@ -34,7 +34,7 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
   See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
   See [Nametag paints](#nametag-paints).
-- **Player**: stream delay, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel.
+- **Player**: stream delay, refresh button, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel.
   See [Player and audio](#player-and-audio).
 - **Chat tools, moderation and auto-claim**: 7TV emotes, an emote menu, highlights, filters, deleted-message recovery and more.
   See [Chat tools](#chat-tools). They're all in the **Chat** tab.
@@ -52,6 +52,8 @@ In **Chat → Player & audio**, and from the 🎚 button in the player controls:
 - **Volume control**: scroll over the video to change the volume (Shift for fine steps, step size adjustable), middle-click to mute,
   with an on-screen volume readout. Twitch's own slider stays in sync.
 - **Volume per channel**: each channel remembers its own volume.
+- **Refresh button** (⟳) in the player's control bar: reloads the stream when it freezes or keeps buffering, without
+  reloading the page. VODs stay where they were. If Twitch's player can't be reached, it reloads the page instead.
 
 Audio processing only starts once you turn on the compressor, boost or mono, and only after you've clicked the page
 (browsers require that), so it can't leave a stream silent. Turning everything off again takes the processing out of the path.
@@ -91,6 +93,8 @@ Everything here can be turned on or off in the **Chat** tab.
 **Deleted messages and links**
 - When a moderator deletes a message or times someone out, the add-on shows what it said (crossed out if you like),
   with links still clickable. Or hide deleted messages completely, or leave it to Twitch.
+- If Twitch takes the message out of chat entirely, or never showed it (deleted within a split second, or while chat
+  was paused), it's put back where it was, marked "deleted" or "timed out".
 - This only works for messages the tab saw before they were removed (it can't recover anything from before you opened the channel).
 
 **Moderation**

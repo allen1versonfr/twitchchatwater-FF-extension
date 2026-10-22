@@ -187,7 +187,7 @@
 
       <div class="group">
         <h2>Deleted messages</h2>
-        <div class="opt"><span class="lbl">When a message is deleted or its sender is timed out<small>Recovered text, including links, comes from messages this tab saw before they were removed</small></span>
+        <div class="opt"><span class="lbl">When a message is deleted or its sender is timed out<small>Recovered text, including links, comes from messages this tab saw before they were removed. Messages Twitch takes out of chat entirely are put back where they were.</small></span>
           <select data-setting="deletedMode">
             <option value="show">Show what it said</option>
             <option value="strike">Show it crossed out</option>
@@ -250,6 +250,8 @@
           <span class="switch"><input type="checkbox" data-setting="audioMono"><span></span></span></div>
         <div class="opt"><span class="lbl">Audio button 🎚 in the player</span>
           <span class="switch"><input type="checkbox" data-setting="audioButton"><span></span></span></div>
+        <div class="opt"><span class="lbl">Refresh button ⟳ in the player<small>Reloads the stream when it freezes or buffers, without reloading the page</small></span>
+          <span class="switch"><input type="checkbox" data-setting="refreshButton"><span></span></span></div>
         <div class="opt"><span class="lbl">Scroll over the video for volume<small>Shift for fine steps, middle-click to mute</small></span>
           <span class="switch"><input type="checkbox" data-setting="wheelVolume"><span></span></span></div>
         <div class="opt"><span class="lbl">Volume step<small>Percent per scroll</small></span>

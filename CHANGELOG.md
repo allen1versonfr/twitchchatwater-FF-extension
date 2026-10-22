@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.0
+
+- **Deleted messages Twitch removes from chat come back**: when a moderator deletes a message or times someone out and
+  Twitch takes the line out of chat entirely (or never draws it, because it was deleted within a split second or while
+  chat was paused), the add-on puts it back where it was, marked "deleted" or "timed out", with links still clickable.
+  Follows the "When a message is deleted" setting (show, crossed out, Twitch default, hide).
+- **Refresh button** ⟳ in the player's control bar: reloads the stream when it freezes or keeps buffering, without
+  reloading the page (VODs keep their position). Turn it off in Chat → Player & audio.
+
 ## 3.2.1
 
 - Fix: the stream delay didn't show. It's now also shown in the player's control bar (next to 🎚), so it appears even when

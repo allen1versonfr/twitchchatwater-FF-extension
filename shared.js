@@ -34,6 +34,7 @@ var TCW = (() => {
     audioBoost: 100,           // % volume, up to 400
     audioMono: false,
     audioButton: true,         // 🎚 button in the player controls
+    refreshButton: true,       // ⟳ button in the player controls (reloads the stream without reloading the page)
     wheelVolume: true,         // scroll over the video for volume, middle-click to mute
     volumeStep: 5,             // % per scroll step
     rememberVolume: true,      // remember the volume for each channel

@@ -36,6 +36,7 @@
   let ircRecent = []; // IRC messages not yet paired with a row
   let domPending = []; // rows not yet paired with an IRC message
   const deletedIds = new Map(); // id -> CLEARMSG event (deleted before its row showed up)
+  let ircLog = []; // every IRC message of the last few minutes (paired or not), oldest first
   let banCount = new Map(); // login -> times timed out/banned (this channel, this session)
   let modEvents = []; // this channel, this session (newest first)
   let buffer = []; // recent rows for "chat was cleared" (oldest first)
@@ -269,31 +270,41 @@
 
   function onIrcMessage(m) {
     m.key = L.msgKey(m.text);
+    if (m.login === C.myLogin() && (m.badges.moderator || m.badges.broadcaster || m.badges.lead_moderator)) modSelf.set(m.ch, true);
     for (let i = 0; i < domPending.length; i++) {
       const p = domPending[i];
       if (p.login === m.login && sameKey(p.key, m.key)) {
         domPending.splice(i, 1);
         const line = p.ref.deref();
+        logIrc(m);
         if (line && line.isConnected) link(line, m);
         return;
       }
     }
     const now = Date.now();
+    logIrc(m);
     ircRecent.push(m);
     if (ircRecent.length > 400 || (ircRecent[0] && now - ircRecent[0].seenAt > 60000)) {
       ircRecent = ircRecent.filter((x) => now - x.seenAt < 60000).slice(-300);
     }
-    if (m.login === C.myLogin() && (m.badges.moderator || m.badges.broadcaster || m.badges.lead_moderator)) modSelf.set(m.ch, true);
+  }
+
+  function logIrc(m) {
+    ircLog.push(m);
+    if (ircLog.length > 600) ircLog = ircLog.slice(-400);
   }
 
   function link(line, m) {
     info.set(line, m);
+    m.row = new WeakRef(line);
+    if (m.ghost) { m.ghost.remove(); m.ghost = null; } // Twitch showed it after all (e.g. chat was paused)
     if (m.id) {
       idLines.set(m.id, new WeakRef(line));
       if (idLines.size > 3000) idLines.delete(idLines.keys().next().value);
       const del = deletedIds.get(m.id);
       if (del) markDeleted(line, del.text, "deleted");
     }
+    if (m.delWhy) markDeleted(line, m.text, m.delWhy);
     decorate(line, {});
   }
 
@@ -347,6 +358,86 @@
     }
   }
 
+  // ---------- deleted messages Twitch removed (or never showed) ----------
+  // When a message is deleted or its sender timed out, Twitch sometimes takes the row out of chat entirely, or
+  // never draws it (deleted within a split second, or while chat was paused). Those come back as a line of our own
+  // where the message was, from the copy the read-only chat connection saw.
+
+  function shownRow(m) {
+    const r = m.row && m.row.deref();
+    if (r && r.isConnected) return r;
+    const mine = linesOf(m.login);
+    const same = mine.find((l) => sameKey(L.msgKey((snap.get(l) || {}).text), m.key));
+    if (same) return same;
+    // a row Twitch drew already deleted ("<message deleted>"), so its text never matched: give it the text
+    const blank = mine.find((l) => !info.has(l) && DELETED_TEXT.test((snap.get(l) || {}).text || ""));
+    if (blank) link(blank, m);
+    return blank || null;
+  }
+
+  function ghostsFor(msgs, why) {
+    for (const m of msgs) m.delWhy = why;
+    setTimeout(() => {
+      const mode = S().deletedMode;
+      if (mode !== "show" && mode !== "strike") return;
+      const list = chatList();
+      if (!list) return;
+      // rows on screen with the time they appeared, to put each recovered message back in its place
+      const rows = [];
+      for (const child of list.children) {
+        const line = child.matches(C.LINE_SEL) ? child : child.querySelector(C.LINE_SEL);
+        const sn = line && snap.get(line);
+        if (sn) rows.push([child, sn.time]);
+      }
+      if (!rows.length) return;
+      const sc = scroller(list);
+      const atBottom = !sc || sc.scrollHeight - sc.scrollTop - sc.clientHeight < 40;
+      for (const m of msgs) {
+        if (m.ghost && m.ghost.isConnected) continue;
+        if (m.ch !== C.currentChannel() || shownRow(m)) continue;
+        if (m.seenAt < rows[0][1] - 1000) continue; // older than everything on screen: scrolled out, not removed
+        const after = placeAfter(list, m, rows);
+        const g = ghostNode(m, why, mode);
+        if (after) after.after(g);
+        else rows[0][0].before(g);
+        m.ghost = g;
+      }
+      if (sc && atBottom) sc.scrollTop = sc.scrollHeight;
+    }, 1500);
+  }
+
+  // Right after the message that came before it in chat (still on screen), or by the time rows appeared.
+  function placeAfter(list, m, rows) {
+    const i = ircLog.indexOf(m);
+    for (let j = i - 1; j >= 0 && j >= i - 50; j--) {
+      const prev = ircLog[j];
+      const r = (prev.ghost && prev.ghost.isConnected && prev.ghost) || (prev.row && prev.row.deref());
+      if (!r || !r.isConnected) continue;
+      let child = r;
+      while (child.parentElement && child.parentElement !== list) child = child.parentElement;
+      if (child.parentElement === list) return child;
+    }
+    let after = null;
+    for (const [child, t] of rows) if (t <= m.seenAt + 300) after = child;
+    return after;
+  }
+
+  function ghostNode(m, why, mode) {
+    const name = el("b", { class: "tcw-ghost-name" }, (m.display || m.login) + (m.action ? " " : ": "));
+    if (m.color) name.style.color = m.color;
+    const ts = S().timestamps;
+    return el("div", { class: `tcw-notice tcw-ghost tcw-del tcw-del-${mode}`, title: `Recovered by Chat Watcher: Twitch removed this message (${why})` },
+      ts !== "off" ? [el("span", { class: "tcw-ts" }, clock(m.time, ts)), " "] : [], name,
+      el("span", { class: "tcw-recovered" }, el("span", { class: "tcw-rec-tag" }, why), " ", ...linkify(m.text)));
+  }
+
+  function applyGhostMode(mode) {
+    for (const g of document.querySelectorAll(".tcw-ghost")) {
+      for (const k of ["show", "strike", "hide", "twitch"]) g.classList.toggle("tcw-del-" + k, k === mode);
+      g.hidden = mode !== "show" && mode !== "strike";
+    }
+  }
+
   function linesOf(login) {
     const out = [];
     for (const line of C.lines()) if (line.isConnected && C.loginOf(line) === login) out.push(line);
@@ -364,6 +455,8 @@
       deletedIds.set(ev.id, ev);
       if (deletedIds.size > 500) deletedIds.delete(deletedIds.keys().next().value);
     }
+    const m = ev.id && ircLog.find((x) => x.id === ev.id);
+    if (m) ghostsFor([m], "deleted");
     addModEvent({ k: "del", login: ev.login, text: ev.text, time: ev.time });
   }
 
@@ -374,6 +467,8 @@
       markDeleted(line, null, why);
       decorate(line, {});
     }
+    const since = Date.now() - 5 * 60000;
+    ghostsFor(ircLog.filter((m) => m.login === ev.login && m.seenAt > since), why);
     addModEvent({ k: "ban", login: ev.login, duration: ev.duration, permanent: ev.permanent, time: ev.time });
     if (S().modNotices && !isMod()) {
       const name = (linesOf(ev.login).map(display).find(Boolean)) || ev.login;
@@ -717,6 +812,7 @@
   function onNav() {
     navAt = Date.now();
     ircRecent = [];
+    ircLog = [];
     domPending = [];
     banCount = new Map();
     modEvents = [];
@@ -732,6 +828,7 @@
     if (!keys) return;
     if (keys.has("ircOn")) subscribe();
     if (keys.has("deletedMode")) for (const line of C.lines()) { const d = delInfo.get(line); if (d && line.isConnected) applyDeleted(line, d); }
+    if (keys.has("deletedMode")) applyGhostMode(s.deletedMode);
     if (["hlWords", "hlColor", "filterWords", "filterUsers", "filterMode", "timestamps", "indFirst", "indReturning", "indRepeat", "modCompat"]
       .some((k) => keys.has(k)) || [...keys].some((k) => k.startsWith("hlBadge"))) redecorateAll();
   }
