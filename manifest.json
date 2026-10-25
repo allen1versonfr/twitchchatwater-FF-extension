@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "3.4.2",
+  "version": "3.4.3",
   "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools and auto-claim for Twitch chat.",
   "icons": {
     "48": "icons/icon-48.png",
