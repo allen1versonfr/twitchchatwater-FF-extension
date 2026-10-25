@@ -108,6 +108,29 @@ test("spamDetector fires once per emote when enough people spam it", () => {
   assert.equal(d2.add(["x"], "a", 2000), null);
 });
 
+test("spamDetector ranks and refreshes active emote waves", () => {
+  const d = L.spamDetector({ windowMs: 10000, minMessages: 2, minUsers: 2, cooldownMs: 60000 });
+  d.add(["A"], "alice", 1000);
+  d.add(["A", "B"], "bob", 1100);
+  const hit = d.add(["B"], "cara", 1200);
+  assert.ok(hit);
+  const active = d.active(1200);
+  assert.deepEqual(active.map((x) => x.name), ["B", "A"]);
+  assert.equal(active[0].users, 2);
+  assert.equal(active[0].count, 2);
+  assert.deepEqual(d.active(12000), []);
+});
+
+test("spamDetector counts one occurrence per emote per message and normalizes logins", () => {
+  const d = L.spamDetector({ windowMs: 10000, minMessages: 2, minUsers: 2, cooldownMs: 60000 });
+  d.add(["KEKW", "KEKW"], "Alice", 1000);
+  assert.equal(d.add(["KEKW"], "alice", 1100), null);
+  assert.equal(d.active(1100).length, 0);
+  const hit = d.add(["KEKW"], "Bob", 1200);
+  assert.equal(hit.name, "KEKW");
+  assert.equal(hit.users, 2);
+});
+
 test("topEmotes sorts by count, then most recent", () => {
   const top = L.topEmotes({ a: { n: 2, last: 1 }, b: { n: 5, last: 1 }, c: { n: 2, last: 9 }, d: { n: 0 } }, 3);
   assert.deepEqual(top.map((e) => e.name), ["b", "c", "a"]);
