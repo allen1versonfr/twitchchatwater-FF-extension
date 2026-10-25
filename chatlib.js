@@ -272,32 +272,55 @@
 
   // ---------- emote spam detection ----------
 
-  // Feed it the emotes of each chat message; it says when one emote is being spammed by several people.
+  // Tracks rolling activity per emote. "add" returns newly-triggered suggestions;
+  // "active" returns all emotes still meeting the live threshold for UI refreshes.
   function spamDetector(opts) {
     const o = { windowMs: 10000, minMessages: 6, minUsers: 4, cooldownMs: 60000, ...opts };
-    const hits = new Map(); // emote -> [{ t, login }]
-    const prompted = new Map(); // emote -> time
+    const hits = new Map();
+    const prompted = new Map();
+
+    function trim(t) {
+      for (const [name, arr] of hits) {
+        while (arr.length && t - arr[0].t > o.windowMs) arr.shift();
+        if (!arr.length) hits.delete(name);
+      }
+      for (const [name, at] of prompted) if (t - at >= o.cooldownMs) prompted.delete(name);
+    }
+
+    function snapshot(t = Date.now()) {
+      trim(t);
+      const out = [];
+      for (const [name, arr] of hits) {
+        if (arr.length < o.minMessages) continue;
+        const users = new Set(arr.map((x) => x.login).filter(Boolean)).size;
+        if (users < o.minUsers) continue;
+        const last = arr[arr.length - 1].t;
+        const score = arr.length * (1 + Math.min(users, 12) / 12);
+        out.push({ name, count: arr.length, users, last, score });
+      }
+      return out.sort((a, b) => b.score - a.score || b.last - a.last || a.name.localeCompare(b.name));
+    }
+
     return {
       opts: o,
       add(emotes, login, t = Date.now()) {
-        let fired = null;
+        trim(t);
+        const user = String(login || "").toLowerCase();
         for (const name of new Set(emotes)) {
+          if (!name) continue;
           let arr = hits.get(name);
           if (!arr) hits.set(name, (arr = []));
-          arr.push({ t, login });
-          while (arr.length && t - arr[0].t > o.windowMs) arr.shift();
-          if (arr.length > 200) arr.splice(0, arr.length - 200);
-          if (arr.length < o.minMessages) continue;
-          const users = new Set(arr.map((x) => x.login)).size;
-          if (users < o.minUsers || (prompted.has(name) && t - prompted.get(name) < o.cooldownMs)) continue;
-          if (!fired || arr.length > fired.count) fired = { name, count: arr.length, users };
+          arr.push({ t, login: user });
+          if (arr.length > 500) arr.splice(0, arr.length - 500);
         }
+        const fired = snapshot(t).find((x) => !prompted.has(x.name));
         if (fired) prompted.set(fired.name, t);
         if (hits.size > 500) {
-          for (const [k, arr] of hits) if (!arr.length || t - arr[arr.length - 1].t > o.windowMs) hits.delete(k);
+          for (const [name, arr] of hits) if (!arr.length || t - arr[arr.length - 1].t > o.windowMs) hits.delete(name);
         }
-        return fired;
+        return fired ? { ...fired } : null;
       },
+      active(t = Date.now()) { return snapshot(t); },
       reset() { hits.clear(); prompted.clear(); }
     };
   }
