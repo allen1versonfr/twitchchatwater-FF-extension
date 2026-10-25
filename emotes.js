@@ -356,7 +356,7 @@
     renderSpam();
     clearTimeout(spamTimer);
     // Wake when the active window expires; don't poll or rebuild the UI every second.
-    const nextExpiry = Math.min(...spamRows.map((row) => row.expiresAt || (Date.now() + 1000)));
+    const nextExpiry = Math.min(...active.map((row) => row.expiresAt || (Date.now() + 1000)));
     spamTimer = setTimeout(() => refreshSpam(spam.active(), []), Math.max(50, nextExpiry - Date.now()));
   }
 
