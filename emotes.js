@@ -75,11 +75,29 @@
       else if (ln.startsWith(lq)) score = 1;
       else if (ln.includes(lq)) score = 2;
       else continue;
-      const uses = stats[e.name] ? stats[e.name].n : 0;
-      scored.push({ e, score, uses, fav: fav.has(e.name) ? 0 : 1 });
+      const usage = stats[e.name] || {};
+      const uses = Number(usage.n) || 0;
+      scored.push({
+        e: { ...e, tag: uses > 0 ? `used ${uses}×` : e.tag },
+        score, uses, last: Number(usage.last) || 0, fav: fav.has(e.name) ? 0 : 1
+      });
     }
-    scored.sort((a, b) => a.score - b.score || a.fav - b.fav || b.uses - a.uses || a.e.name.length - b.e.name.length);
+    // Keep prefix matches ahead of substring matches, but personalize each group
+    // by the emotes the user actually sends most often.
+    scored.sort((a, b) => a.score - b.score || b.uses - a.uses || b.last - a.last || a.fav - b.fav || a.e.name.length - b.e.name.length);
     return scored.slice(0, limit).map((x) => x.e);
+  }
+
+  function mostUsedSuggestions(limit = 10) {
+    const all = catalog();
+    const used = L.topEmotes(stats, limit).map((s) => {
+      const e = all.get(s.name) || { name: s.name, src: s.src, p: s.p };
+      return { ...e, src: httpsSrc(e.src || s.src), p: e.p || s.p, tag: `used ${s.n}×` };
+    });
+    if (used.length) return used;
+    // A new install has no personal history yet; still make ":" useful.
+    const fallback = [...favs, ...recent].filter((e, i, a) => e && e.name && a.findIndex((x) => x.name === e.name) === i);
+    return fallback.slice(0, limit).map((e) => ({ ...e, tag: favSet().has(e.name) ? "favorite" : "recent" }));
   }
 
   // ---------- 7TV / BTTV / FFZ in chat ----------
@@ -659,9 +677,9 @@
   function updateColon() {
     if (!S().emoteColon) return;
     const info = I().wordBefore();
-    const m = info && /^:([^\s:]{2,})$/.exec(info.word);
+    const m = info && /^:([^\s:]*)$/.exec(info.word);
     if (!m) { if (sug && sug.mode === "colon") closeSug(); return; }
-    const items = search(m[1], 10);
+    const items = m[1] ? search(m[1], 10) : mostUsedSuggestions(10);
     if (!items.length) { closeSug(); return; }
     sug = { mode: "colon", items, idx: 0 };
     drawSug();

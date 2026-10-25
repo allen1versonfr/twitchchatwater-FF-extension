@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.4.3
+
+- **Personalized emote autocomplete:** typing `:` opens suggestions for your most-used emotes, ranked from your own emote usage history.
+- Continue typing after the colon to filter suggestions; matching emotes are prioritized by how often you use them, with usage counts shown beside them.
+- New installs without usage history fall back to favorites and recently used emotes.
+- Uses the existing emote autocomplete setting and local usage statistics; no new permissions or external services.
+
+
 ## 3.4.2
 
 - Stabilized the emote-spam popup by reusing its rows instead of rebuilding the interface on every chat message.
