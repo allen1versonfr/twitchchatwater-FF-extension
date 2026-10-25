@@ -854,7 +854,9 @@
     if (sug && !path.some((n) => n.id === "tcw-sug-host")) closeSug();
   }, true);
   window.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu) closeMenu(); });
-  window.addEventListener("resize", () => { closeSug(); closeMenu(); });
+  window.addEventListener("resize", () => { closeSug(); closeMenu(); repositionSpam(); }, { passive: true });
+  window.addEventListener("scroll", repositionSpam, { passive: true, capture: true });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) repositionSpam(); });
   setInterval(ensureButton, 2000);
   // keeps live emote updates coming for this channel (and picks up FFZ changes every 10 minutes)
   setInterval(() => {
