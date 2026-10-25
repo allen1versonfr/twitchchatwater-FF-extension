@@ -245,8 +245,12 @@
         twitchSeen.set(e.name, e.src);
         if (twitchSeen.size > 1500) twitchSeen.delete(twitchSeen.keys().next().value);
       }
-      const pop = popular.get(e.name) || { n: 0, src: e.src, p: e.p, last: 0 };
+      const pop = popular.get(e.name) || { n: 0, src: "", p: e.p, last: 0 };
       pop.n++;
+      // Twitch/extension emote images can be missing on an early DOM pass;
+      // retain a later usable HTTPS source instead of pinning the first empty one.
+      if (e.src) pop.src = e.src;
+      if (e.p) pop.p = e.p;
       pop.last = Date.now();
       popular.set(e.name, pop);
     }
