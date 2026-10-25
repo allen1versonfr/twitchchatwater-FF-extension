@@ -441,7 +441,11 @@
       dom.detail.textContent = spamText(row);
       dom.dismiss.setAttribute("aria-label", "Dismiss " + row.name);
       updateSpamVisual(dom, row);
-      spamBox.append(dom.root); // moves existing nodes only when ranking changes
+      const index = spamRows.indexOf(row);
+      const atPosition = spamBox.children[index];
+      if (dom.root.parentElement !== spamBox || atPosition !== dom.root) {
+        spamBox.insertBefore(dom.root, atPosition || null);
+      }
     }
     placeAbove(spamBox, 270);
   }
