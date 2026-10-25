@@ -262,8 +262,8 @@
     if (S().emoteSpam && S().enabled) {
       spam.opts.minMessages = Math.max(2, Number(S().spamMin) || 6);
       spam.opts.minUsers = Math.max(1, Math.min(spam.opts.minMessages, Number(S().spamUsers) || 4));
-      const hit = spam.add(found.map((e) => e.name), info.login);
-      if (hit) showSpam(hit, found.find((e) => e.name === hit.name));
+      spam.add(found.map((e) => e.name), info.login);
+      refreshSpam(spam.active(), found);
     }
   }
 
@@ -294,87 +294,106 @@
       : el("span", { class: (cls || "") + " tcw-noimg" }, e.name.slice(0, 3));
   }
 
-  // ---------- emote spam: "join in" buttons ----------
-  // Up to 3 emotes being spammed at once, newest on top. Each Send button can be pressed again and again;
-  // the box goes away 12 s after the last spam or click. Twitch refuses the same message twice within 30 s,
-  // so repeats alternate an invisible character at the end (like 7TV does).
-
+  // ---------- emote spam: compact one-click "join in" suggestions ----------
   const SPAM_MAX = 3;
-  const SPAM_TTL = 12000;
   const INVISIBLE = " \u{E0000}";
-  let spamRows = []; // { name, e, count, users, sent, node }
+  let spamRows = [];
   let spamTimer = 0;
+  let spamDismissed = new Set();
   let lastSent = { text: "", t: 0, alt: false };
 
   function closeSpam() {
     clearTimeout(spamTimer);
+    spamTimer = 0;
     spamRows = [];
+    spamDismissed.clear();
     const h = document.getElementById("tcw-spam-host");
     if (h) h.replaceChildren();
   }
 
-  function keepSpam() {
-    clearTimeout(spamTimer);
-    spamTimer = setTimeout(closeSpam, SPAM_TTL);
-  }
-
-  function showSpam(hit, e) {
-    if (!I().box()) return;
-    let row = spamRows.find((r) => r.name === hit.name);
-    if (row) {
-      Object.assign(row, { count: hit.count, users: hit.users });
-      spamRows = [row, ...spamRows.filter((r) => r !== row)];
-    } else {
-      row = { name: hit.name, e: e || { name: hit.name }, count: hit.count, users: hit.users, sent: 0, node: null };
-      spamRows = [row, ...spamRows].slice(0, SPAM_MAX);
-    }
-    renderSpam();
-    keepSpam();
+  function burstSize(row) {
+    // A more intense chat wave produces a larger one-click burst, capped to avoid flooding chat.
+    return Math.max(1, Math.min(5, Math.ceil(row.count / Math.max(1, row.users))));
   }
 
   function spamText(row) {
-    if (!row.sent) return `${row.count} messages from ${row.users} people`;
-    return `${row.count} messages from ${row.users} people · you sent it ${row.sent}×`;
+    return `${row.count} messages · ${row.users} people · sends ${burstSize(row)}×`;
+  }
+
+  function refreshSpam(active, found = []) {
+    const activeNames = new Set(active.map((x) => x.name));
+    for (const name of spamDismissed) if (!activeNames.has(name)) spamDismissed.delete(name);
+    const previous = new Map(spamRows.map((r) => [r.name, r]));
+    const currentEmotes = new Map(found.map((e) => [e.name, e]));
+    spamRows = active.filter((hit) => !spamDismissed.has(hit.name)).slice(0, SPAM_MAX).map((hit) => {
+      const old = previous.get(hit.name);
+      return {
+        name: hit.name,
+        e: currentEmotes.get(hit.name) || (old && old.e) || { name: hit.name },
+        count: hit.count, users: hit.users, last: hit.last,
+        sent: old ? old.sent : 0
+      };
+    });
+    if (!spamRows.length) {
+      clearTimeout(spamTimer);
+      spamTimer = 0;
+      const h = document.getElementById("tcw-spam-host");
+      if (h) h.replaceChildren();
+      if (!active.length) spamDismissed.clear();
+      return;
+    }
+    renderSpam();
+    clearTimeout(spamTimer);
+    // Independently expire each suggestion when its rolling activity window dies out.
+    spamTimer = setTimeout(() => refreshSpam(spam.active(), []), 800);
   }
 
   function renderSpam() {
     const h = host("tcw-spam-host");
     if (!spamRows.length) return h.replaceChildren();
-    const box = el("div", { class: "tcw-spam", role: "status" },
+    const box = el("div", { class: "tcw-spam", role: "status", "aria-label": "Emotes currently being spammed" },
       spamRows.map((row) => {
-        const send = el("button", { class: "tcw-btn tcw-primary", title: "Send it (press again to send it again)" }, "Send");
-        const close = el("button", { class: "tcw-btn tcw-icon", title: "Dismiss", "aria-label": "Dismiss " + row.name }, "✕");
-        const info = el("small", {}, spamText(row));
-        send.addEventListener("click", () => sendSpam(row, send, info));
-        close.addEventListener("click", () => {
-          spamRows = spamRows.filter((r) => r !== row);
+        const copies = burstSize(row);
+        const pick = el("button", {
+          class: "tcw-spam-pick",
+          title: `Send ${copies} ${row.name} emote${copies === 1 ? "" : "s"}`,
+          "aria-label": `Send ${copies} ${row.name} emotes`
+        }, emoteImg(row.e, "tcw-spam-img"),
+        el("span", { class: "tcw-spam-copy" },
+          el("b", {}, row.name),
+          el("small", {}, spamText(row))));
+        const dismiss = el("button", { class: "tcw-btn tcw-icon tcw-spam-dismiss", title: "Dismiss", "aria-label": "Dismiss " + row.name }, "×");
+        pick.addEventListener("click", () => sendSpam(row, pick));
+        dismiss.addEventListener("click", () => {
+          spamDismissed.add(row.name);
+          spamRows = spamRows.filter((r) => r.name !== row.name);
           renderSpam();
         });
-        return el("div", { class: "tcw-spam-row" },
-          emoteImg(row.e, "tcw-spam-img"),
-          el("div", { class: "tcw-spam-txt" }, el("b", {}, row.name), info),
-          send, close);
+        return el("div", { class: "tcw-spam-row" }, pick, dismiss);
       }));
     h.replaceChildren(box);
-    placeAbove(box, 320);
+    placeAbove(box, 270);
   }
 
-  async function sendSpam(row, btn, info) {
+  async function sendSpam(row, btn) {
     if (btn.disabled) return;
-    btn.disabled = true; // a short pause between presses, so a double click doesn't send twice
-    keepSpam();
+    btn.disabled = true;
+    const copies = burstSize(row);
+    const text = Array(copies).fill(row.name).join(" ");
     const now = Date.now();
-    const repeat = lastSent.text === row.name && now - lastSent.t < 30000;
+    const repeat = lastSent.text === text && now - lastSent.t < 30000;
     const alt = repeat ? !lastSent.alt : false;
-    const r = await I().send(alt ? row.name + INVISIBLE : row.name);
+    const message = alt ? text + INVISIBLE : text;
+    const r = await I().send(message);
     if (r.ok) {
-      lastSent = { text: row.name, t: now, alt };
-      row.sent++;
-      info.textContent = spamText(row);
-    } else if (r.why === "busy" && I().insert(row.name)) C.toast(`Added ${row.name} to your message`);
-    else if (r.why === "insert") C.toast("Press Enter to send it");
+      lastSent = { text, t: now, alt };
+      const current = spamRows.find((x) => x.name === row.name);
+      if (current) current.sent = (current.sent || 0) + copies;
+    } else if (r.why === "busy" && I().insert(text)) {
+      C.toast("Added emote burst to your message; press Enter to send");
+    } else if (r.why === "insert") C.toast("Couldn't send the emote; try again");
     else C.toast("Couldn't find the chat box");
-    setTimeout(() => { btn.disabled = false; }, 1000);
+    setTimeout(() => { if (btn.isConnected) btn.disabled = false; }, 700);
   }
 
   // ---------- emote menu ----------
