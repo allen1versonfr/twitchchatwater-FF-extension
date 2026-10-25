@@ -331,7 +331,7 @@
       return {
         name: hit.name,
         e: currentEmotes.get(hit.name) || (old && old.e) || { name: hit.name },
-        count: hit.count, users: hit.users, last: hit.last,
+        count: hit.count, users: hit.users, last: hit.last, expiresAt: hit.expiresAt,
         sent: old ? old.sent : 0
       };
     });
