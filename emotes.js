@@ -836,6 +836,11 @@
   });
 
   function onSettings(s, keys) {
+    if (keys && (keys.has("emoteSpam") || keys.has("enabled"))) {
+      // Don't leave a stale popup onscreen after the feature is disabled or toggled.
+      spam.reset();
+      closeSpam();
+    }
     if (!keys) {
       loadStored();
       load7tv(C.currentChannel());
