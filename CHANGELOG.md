@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.4.1
+
+- **Smarter "Join in on emote spam" suggestions**: refreshes as the chat wave changes and shows up to three currently active emotes, ranked by activity, participation, and recency.
+- **Compact one-click sending**: select an emote suggestion to send a burst without a separate Send button. Burst size is based on observed spam and capped to avoid oversized messages.
+- Suggestions expire when the spam wave fades, and the popup uses a more compact, less intrusive layout.
+- Added tests for active-suggestion ranking, expiry, duplicate handling, and login normalization.
+
 ## 3.4.0
 
 - **Join in on emote spam** now shows up to **3 emotes** at once (newest on top), each with its own Send button.
