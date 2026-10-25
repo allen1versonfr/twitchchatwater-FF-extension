@@ -335,7 +335,10 @@
       const old = previous.get(hit.name);
       return {
         name: hit.name,
-        e: currentEmotes.get(hit.name) || (old && old.e) || { name: hit.name },
+        e: currentEmotes.get(hit.name) || (old && old.e && old.e.src ? old.e : null) || (() => {
+          const seen = popular.get(hit.name);
+          return seen && seen.src ? { name: hit.name, src: seen.src, p: seen.p } : { name: hit.name };
+        })(),
         count: hit.count, users: hit.users, last: hit.last, expiresAt: hit.expiresAt,
         sent: old ? old.sent : 0
       };
@@ -448,6 +451,24 @@
       }
     }
     placeAbove(spamBox, 270);
+    const anchor = I().popupAnchor();
+    const available = Math.max(0, window.innerHeight - anchor.bottom - 8);
+    spamBox.style.maxHeight = Math.max(36, Math.min(160, available)) + "px";
+    spamBox.style.overflowY = available < 112 ? "auto" : "visible";
+  }
+
+  function repositionSpam() {
+    if (!spamBox || !spamBox.isConnected) return;
+    const b = I().box();
+    if (!b || !b.isConnected || b.getBoundingClientRect().width < 1 || b.getBoundingClientRect().height < 1) {
+      closeSpam();
+      return;
+    }
+    placeAbove(spamBox, 270);
+    const anchor = I().popupAnchor();
+    const available = Math.max(0, window.innerHeight - anchor.bottom - 8);
+    spamBox.style.maxHeight = Math.max(36, Math.min(160, available)) + "px";
+    spamBox.style.overflowY = available < 112 ? "auto" : "visible";
   }
 
   async function sendSpam(row, btn) {
