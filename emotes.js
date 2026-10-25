@@ -496,6 +496,10 @@
         C.toast("Finish or clear your current chat message before sending the emote burst");
       } else if (r && r.why === "insert") {
         C.toast("Twitch didn't accept the emote burst. Check the chat box and try again");
+      } else if (r && r.why === "send-disabled") {
+        C.toast("Twitch chat is not ready to send yet; the message was left in the chat box");
+      } else if (r && r.why === "send-failed") {
+        C.toast("Twitch didn't send the burst; the message was left in the chat box");
       } else {
         C.toast("Couldn't find the chat box");
       }
