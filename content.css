@@ -305,6 +305,7 @@ html.tw-root--theme-light .tcw-tb-btn { color: #0e0e10; }
 .tcw-spam-pick:hover { background: #2b2b30; }
 .tcw-spam-pick:focus-visible { outline: 2px solid #9147ff; outline-offset: -1px; }
 .tcw-spam-pick:disabled { opacity: .55; cursor: default; }
+.tcw-spam-visual { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; min-width: 24px; }
 .tcw-spam-img { height: 24px; width: auto; max-width: 56px; flex: 0 0 auto; }
 .tcw-spam-copy { display: block; min-width: 0; flex: 1; }
 .tcw-spam-copy b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
