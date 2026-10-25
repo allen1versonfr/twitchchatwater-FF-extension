@@ -345,8 +345,9 @@
     }
     renderSpam();
     clearTimeout(spamTimer);
-    // Independently expire each suggestion when its rolling activity window dies out.
-    spamTimer = setTimeout(() => refreshSpam(spam.active(), []), 800);
+    // Refresh only when the oldest qualifying message expires; avoid repainting/flickering every second.
+    const nextExpiry = Math.min(...spamRows.map((row) => row.expiresAt || (Date.now() + 1000)));
+    spamTimer = setTimeout(() => refreshSpam(spam.active(), []), Math.max(25, nextExpiry - Date.now()));
   }
 
   function renderSpam() {
