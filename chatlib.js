@@ -318,7 +318,8 @@
         if (hits.size > 500) {
           for (const [name, arr] of hits) if (!arr.length || t - arr[arr.length - 1].t > o.windowMs) hits.delete(name);
         }
-        return fired ? { ...fired } : null;
+        // Preserve the original public return shape; richer fields are available via active().
+        return fired ? { name: fired.name, count: fired.count, users: fired.users } : null;
       },
       active(t = Date.now()) { return snapshot(t); },
       reset() { hits.clear(); prompted.clear(); }
