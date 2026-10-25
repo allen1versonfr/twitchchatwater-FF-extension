@@ -312,8 +312,9 @@
   }
 
   function burstSize(row) {
-    // Match the number of observed spam messages, with a conservative cap for chat safety.
-    return Math.max(1, Math.min(10, row.count));
+    // Match observed spam volume, capped to 10 emotes and Twitch's message-length limit.
+    const byLength = Math.max(1, Math.floor(450 / (String(row.name || "").length + 1)));
+    return Math.max(1, Math.min(10, row.count, byLength));
   }
 
   function spamText(row) {
