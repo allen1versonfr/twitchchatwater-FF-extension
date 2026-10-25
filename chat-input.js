@@ -175,8 +175,15 @@
     await new Promise((r) => setTimeout(r, 60));
     if (value(b).trim() !== text.trim()) return { ok: false, why: "insert" };
     const btn = sendButton();
+    if (btn && (btn.disabled || btn.getAttribute("aria-disabled") === "true")) {
+      return { ok: false, why: "send-disabled" };
+    }
     if (btn) btn.click();
     else b.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    // Twitch may ignore a click while its chat UI is updating. Don't report success
+    // until the editor actually clears; leave any unsent text in place for recovery.
+    await new Promise((r) => setTimeout(r, 180));
+    if (value(b).trim()) return { ok: false, why: "send-failed" };
     return { ok: true };
   }
 
