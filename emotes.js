@@ -245,8 +245,12 @@
         twitchSeen.set(e.name, e.src);
         if (twitchSeen.size > 1500) twitchSeen.delete(twitchSeen.keys().next().value);
       }
-      const pop = popular.get(e.name) || { n: 0, src: e.src, p: e.p, last: 0 };
+      const pop = popular.get(e.name) || { n: 0, src: "", p: e.p, last: 0 };
       pop.n++;
+      // Twitch/extension emote images can be missing on an early DOM pass;
+      // retain a later usable HTTPS source instead of pinning the first empty one.
+      if (e.src) pop.src = e.src;
+      if (e.p) pop.p = e.p;
       pop.last = Date.now();
       popular.set(e.name, pop);
     }
@@ -301,18 +305,23 @@
   let spamTimer = 0;
   let spamDismissed = new Set();
   let lastSent = { text: "", t: 0, alt: false };
+  let spamSending = false;
+  let spamBox = null;
+  const spamDomRows = new Map();
 
   function closeSpam() {
     clearTimeout(spamTimer);
     spamTimer = 0;
     spamRows = [];
     spamDismissed.clear();
+    spamDomRows.clear();
+    spamBox = null;
     const h = document.getElementById("tcw-spam-host");
     if (h) h.replaceChildren();
   }
 
   function burstSize(row) {
-    // Match observed spam volume, capped to 10 emotes and Twitch's message-length limit.
+    // One compact burst based on the observed wave, capped to avoid flooding chat.
     const byLength = Math.max(1, Math.floor(450 / (String(row.name || "").length + 1)));
     return Math.max(1, Math.min(10, row.count, byLength));
   }
@@ -330,7 +339,10 @@
       const old = previous.get(hit.name);
       return {
         name: hit.name,
-        e: currentEmotes.get(hit.name) || (old && old.e) || { name: hit.name },
+        e: currentEmotes.get(hit.name) || (old && old.e && old.e.src ? old.e : null) || (() => {
+          const seen = popular.get(hit.name);
+          return seen && seen.src ? { name: hit.name, src: seen.src, p: seen.p } : { name: hit.name };
+        })(),
         count: hit.count, users: hit.users, last: hit.last, expiresAt: hit.expiresAt,
         sent: old ? old.sent : 0
       };
@@ -338,6 +350,8 @@
     if (!spamRows.length) {
       clearTimeout(spamTimer);
       spamTimer = 0;
+      spamDomRows.clear();
+      spamBox = null;
       const h = document.getElementById("tcw-spam-host");
       if (h) h.replaceChildren();
       if (!active.length) spamDismissed.clear();
@@ -345,57 +359,157 @@
     }
     renderSpam();
     clearTimeout(spamTimer);
-    // Refresh only when the oldest qualifying message expires; avoid repainting/flickering every second.
-    const nextExpiry = Math.min(...spamRows.map((row) => row.expiresAt || (Date.now() + 1000)));
-    spamTimer = setTimeout(() => refreshSpam(spam.active(), []), Math.max(25, nextExpiry - Date.now()));
+    // Wake when the active window expires; don't poll or rebuild the UI every second.
+    const nextExpiry = Math.min(...active.map((row) => row.expiresAt || (Date.now() + 1000)));
+    spamTimer = setTimeout(() => refreshSpam(spam.active(), []), Math.max(50, nextExpiry - Date.now()));
+  }
+
+  function makeSpamDomRow(name) {
+    const pick = el("button", {
+      class: "tcw-spam-pick",
+      title: `Send ${name} emotes`,
+      "aria-label": `Send ${name} emotes`
+    });
+    const visual = el("span", { class: "tcw-spam-visual" });
+    const copy = el("span", { class: "tcw-spam-copy" });
+    const label = el("b", {}, name);
+    const detail = el("small", {});
+    copy.append(label, detail);
+    pick.append(visual, copy);
+    const dismiss = el("button", { class: "tcw-btn tcw-icon tcw-spam-dismiss", title: "Dismiss", "aria-label": "Dismiss " + name }, "×");
+    const root = el("div", { class: "tcw-spam-row" }, pick, dismiss);
+    pick.addEventListener("click", () => {
+      const row = spamRows.find((r) => r.name === name);
+      if (row) sendSpam(row, pick);
+    });
+    dismiss.addEventListener("click", () => {
+      spamDismissed.add(name);
+      spamRows = spamRows.filter((r) => r.name !== name);
+      renderSpam();
+    });
+    return { root, pick, visual, label, detail, dismiss, imageSrc: "" };
+  }
+
+  function updateSpamVisual(dom, row) {
+    const src = httpsSrc(row.e && row.e.src);
+    if (src) {
+      let img = dom.visual.querySelector("img");
+      if (!img) {
+        dom.visual.replaceChildren(el("img", {
+          class: "tcw-spam-img", src, alt: row.name, loading: "lazy",
+          decoding: "async", referrerpolicy: "no-referrer", draggable: "false"
+        }));
+      } else {
+        if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+        img.alt = row.name;
+      }
+    } else {
+      let fallback = dom.visual.querySelector(".tcw-noimg");
+      if (!fallback) {
+        dom.visual.replaceChildren(el("span", { class: "tcw-spam-img tcw-noimg" }, row.name.slice(0, 3)));
+      } else if (fallback.textContent !== row.name.slice(0, 3)) {
+        fallback.textContent = row.name.slice(0, 3);
+      }
+    }
   }
 
   function renderSpam() {
     const h = host("tcw-spam-host");
-    if (!spamRows.length) return h.replaceChildren();
-    const box = el("div", { class: "tcw-spam", role: "status", "aria-label": "Emotes currently being spammed" },
-      spamRows.map((row) => {
-        const copies = burstSize(row);
-        const pick = el("button", {
-          class: "tcw-spam-pick",
-          title: `Send ${copies} ${row.name} emote${copies === 1 ? "" : "s"}`,
-          "aria-label": `Send ${copies} ${row.name} emotes`
-        }, emoteImg(row.e, "tcw-spam-img"),
-        el("span", { class: "tcw-spam-copy" },
-          el("b", {}, row.name),
-          el("small", {}, spamText(row))));
-        const dismiss = el("button", { class: "tcw-btn tcw-icon tcw-spam-dismiss", title: "Dismiss", "aria-label": "Dismiss " + row.name }, "×");
-        pick.addEventListener("click", () => sendSpam(row, pick));
-        dismiss.addEventListener("click", () => {
-          spamDismissed.add(row.name);
-          spamRows = spamRows.filter((r) => r.name !== row.name);
-          renderSpam();
-        });
-        return el("div", { class: "tcw-spam-row" }, pick, dismiss);
-      }));
-    h.replaceChildren(box);
-    placeAbove(box, 270);
+    if (!spamRows.length) {
+      h.replaceChildren();
+      spamBox = null;
+      spamDomRows.clear();
+      return;
+    }
+    if (!spamBox || !spamBox.isConnected) {
+      spamBox = el("div", { class: "tcw-spam", role: "status", "aria-label": "Emotes currently being spammed" });
+      h.replaceChildren(spamBox);
+    }
+    const visible = new Set(spamRows.map((row) => row.name));
+    for (const [name, dom] of spamDomRows) {
+      if (!visible.has(name)) {
+        dom.root.remove();
+        spamDomRows.delete(name);
+      }
+    }
+    // Reuse each row's DOM nodes. Twitch chat can emit many messages per second;
+    // replacing the whole popup on every message caused flicker and lost click state.
+    for (const row of spamRows) {
+      let dom = spamDomRows.get(row.name);
+      if (!dom) {
+        dom = makeSpamDomRow(row.name);
+        spamDomRows.set(row.name, dom);
+      }
+      const copies = burstSize(row);
+      dom.pick.title = `Send ${copies} ${row.name} emote${copies === 1 ? "" : "s"}`;
+      dom.pick.setAttribute("aria-label", `Send ${copies} ${row.name} emotes`);
+      dom.pick.disabled = spamSending;
+      dom.label.textContent = row.name;
+      dom.detail.textContent = spamText(row);
+      dom.dismiss.setAttribute("aria-label", "Dismiss " + row.name);
+      updateSpamVisual(dom, row);
+      const index = spamRows.indexOf(row);
+      const atPosition = spamBox.children[index];
+      if (dom.root.parentElement !== spamBox || atPosition !== dom.root) {
+        spamBox.insertBefore(dom.root, atPosition || null);
+      }
+    }
+    placeAbove(spamBox, 270);
+    const anchor = I().popupAnchor();
+    const available = Math.max(0, window.innerHeight - anchor.bottom - 8);
+    spamBox.style.maxHeight = Math.max(36, Math.min(160, available)) + "px";
+    spamBox.style.overflowY = available < 112 ? "auto" : "visible";
+  }
+
+  function repositionSpam() {
+    if (!spamBox || !spamBox.isConnected) return;
+    const b = I().box();
+    if (!b || !b.isConnected || b.getBoundingClientRect().width < 1 || b.getBoundingClientRect().height < 1) {
+      closeSpam();
+      return;
+    }
+    placeAbove(spamBox, 270);
+    const anchor = I().popupAnchor();
+    const available = Math.max(0, window.innerHeight - anchor.bottom - 8);
+    spamBox.style.maxHeight = Math.max(36, Math.min(160, available)) + "px";
+    spamBox.style.overflowY = available < 112 ? "auto" : "visible";
   }
 
   async function sendSpam(row, btn) {
-    if (btn.disabled) return;
-    btn.disabled = true;
+    if (spamSending || btn.disabled) return;
+    spamSending = true;
+    renderSpam();
     const copies = burstSize(row);
     const text = Array(copies).fill(row.name).join(" ");
     const now = Date.now();
     const repeat = lastSent.text === text && now - lastSent.t < 30000;
     const alt = repeat ? !lastSent.alt : false;
     const message = alt ? text + INVISIBLE : text;
-    const r = await I().send(message);
-    if (r.ok) {
-      lastSent = { text, t: now, alt };
-      const current = spamRows.find((x) => x.name === row.name);
-      if (current) current.sent = (current.sent || 0) + copies;
-    } else if (r.why === "busy" && I().insert(text)) {
-      C.toast("Added emote burst to your message; press Enter to send");
-    } else if (r.why === "insert") C.toast("Couldn't send the emote; try again");
-    else C.toast("Couldn't find the chat box");
-    setTimeout(() => { if (btn.isConnected) btn.disabled = false; }, 700);
+    try {
+      const r = await I().send(message);
+      if (r && r.ok) {
+        lastSent = { text, t: now, alt };
+        const current = spamRows.find((x) => x.name === row.name);
+        if (current) current.sent = (current.sent || 0) + copies;
+      } else if (r && r.why === "busy") {
+        // Never append a burst to a message the user is already composing.
+        C.toast("Finish or clear your current chat message before sending the emote burst");
+      } else if (r && r.why === "insert") {
+        C.toast("Twitch didn't accept the emote burst. Check the chat box and try again");
+      } else if (r && r.why === "send-disabled") {
+        C.toast("Twitch chat is not ready to send yet; the message was left in the chat box");
+      } else if (r && r.why === "send-failed") {
+        C.toast("Twitch didn't send the burst; the message was left in the chat box");
+      } else {
+        C.toast("Couldn't find the chat box");
+      }
+    } catch (err) {
+      C.toast("Couldn't send the emote burst. Try again");
+      C.debug("emote spam send failed", err);
+    } finally {
+      spamSending = false;
+      renderSpam();
+    }
   }
 
   // ---------- emote menu ----------
@@ -722,6 +836,11 @@
   });
 
   function onSettings(s, keys) {
+    if (keys && (keys.has("emoteSpam") || keys.has("enabled"))) {
+      // Don't leave a stale popup onscreen after the feature is disabled or toggled.
+      spam.reset();
+      closeSpam();
+    }
     if (!keys) {
       loadStored();
       load7tv(C.currentChannel());
@@ -748,7 +867,9 @@
     if (sug && !path.some((n) => n.id === "tcw-sug-host")) closeSug();
   }, true);
   window.addEventListener("keydown", (e) => { if (e.key === "Escape" && menu) closeMenu(); });
-  window.addEventListener("resize", () => { closeSug(); closeMenu(); });
+  window.addEventListener("resize", () => { closeSug(); closeMenu(); repositionSpam(); }, { passive: true });
+  window.addEventListener("scroll", repositionSpam, { passive: true, capture: true });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) repositionSpam(); });
   setInterval(ensureButton, 2000);
   // keeps live emote updates coming for this channel (and picks up FFZ changes every 10 minutes)
   setInterval(() => {
