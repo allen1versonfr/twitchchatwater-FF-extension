@@ -312,8 +312,8 @@
   }
 
   function burstSize(row) {
-    // A more intense chat wave produces a larger one-click burst, capped to avoid flooding chat.
-    return Math.max(1, Math.min(5, Math.ceil(row.count / Math.max(1, row.users))));
+    // Match the number of observed spam messages, with a conservative cap for chat safety.
+    return Math.max(1, Math.min(10, row.count));
   }
 
   function spamText(row) {
