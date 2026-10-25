@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.4.2
+
+- Stabilized the emote-spam popup by reusing its rows instead of rebuilding the interface on every chat message.
+- Kept popup position synchronized with chat input while scrolling, resizing, and returning to the tab; constrained its height so it stays compact and scrollable when space is limited.
+- Retained usable emote image URLs when Twitch's first DOM pass has no image source.
+- Refreshed suggestions when any active spam wave expires and cleared stale suggestions when the feature is toggled off.
+- Verified the chat editor actually clears before reporting a burst as sent; when Twitch rejects or disables sending, the text remains available for manual recovery.
+- Automated tests pass. Live Twitch chat behavior still requires a real-browser check.
+
+
 ## 3.4.1
 
 - **Smarter "Join in on emote spam" suggestions**: refreshes as the chat wave changes and shows up to three currently active emotes, ranked by activity, participation, and recency.
