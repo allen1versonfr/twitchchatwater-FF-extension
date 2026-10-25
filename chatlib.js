@@ -296,7 +296,7 @@
         if (users < o.minUsers) continue;
         const last = arr[arr.length - 1].t;
         const score = arr.length * (1 + Math.min(users, 12) / 12);
-        out.push({ name, count: arr.length, users, last, score });
+        out.push({ name, count: arr.length, users, last, expiresAt: arr[0].t + o.windowMs + 1, score });
       }
       return out.sort((a, b) => b.score - a.score || b.last - a.last || a.name.localeCompare(b.name));
     }
