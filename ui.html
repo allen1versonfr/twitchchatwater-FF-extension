@@ -98,6 +98,8 @@
           <span class="switch"><input type="checkbox" data-setting="emoteMenu"><span></span></span></div>
         <div class="opt"><span class="lbl">Suggestions while typing “;” <span class="new">New</span><small>Type ;kek to see matching emotes (just ; shows your most used); Tab or Enter inserts one</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteColon"><span></span></span></div>
+        <div class="opt"><span class="lbl">Suggest emotes as you type <span class="new">New</span><small>Like 7TV: matching emotes pop up for every word, no “;” needed. Tab inserts the highlighted one; Enter still sends your message.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="emoteSugAlways"><span></span></span></div>
         <div class="opt"><span class="lbl">Tab completion<small>Type part of a name and press Tab to cycle through matching emotes (Shift+Tab goes back)</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteTab"><span></span></span></div>
         <div class="opt"><span class="lbl">Join in on emote spam<small>When chat spams an emote, a button appears that sends it for you (up to 3 emotes, press as often as you like)</small></span>
@@ -107,6 +109,8 @@
           <input type="number" min="1" max="50" step="1" data-setting="spamUsers" aria-label="People"></div>
         <div class="opt"><span class="lbl">Spam popup opacity <span class="new">New</span><small>From almost clear to solid; it turns solid while your mouse is over it</small></span>
           <input type="range" min="10" max="100" step="5" data-setting="spamOpacity" aria-label="Spam popup opacity"><output data-for="spamOpacity"></output></div>
+        <div class="opt"><span class="lbl">Bypass duplicate message check <span class="new">New</span><small>Like 7TV: send the same message again within 30 seconds. An invisible character is added to every other repeat so Twitch accepts it. Skipped in emote-only mode, where Twitch would reject it.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="dupBypass"><span></span></span></div>
         <div class="opt"><span class="lbl">Message history<small>↑ / ↓ in an empty chat box brings back what you sent (this tab only)</small></span>
           <span class="switch"><input type="checkbox" data-setting="inputHistory"><span></span></span></div>
         <div class="opt col"><span class="lbl">Your emotes<small id="emoteSummary">—</small></span>

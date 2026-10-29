@@ -88,7 +88,9 @@
       return { k: "ban", ch: chan, login: target, duration: d ? Number(d) || 0 : 0, permanent: !d, time };
     }
     if (m.command === "ROOMSTATE" && t["room-id"]) {
-      return { k: "room", ch: chan, room: t["room-id"] };
+      const ev = { k: "room", ch: chan, room: t["room-id"] };
+      if ("emote-only" in t) ev.emoteOnly = t["emote-only"] === "1";
+      return ev;
     }
     return null;
   }

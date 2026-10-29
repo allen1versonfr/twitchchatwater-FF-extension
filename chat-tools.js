@@ -773,8 +773,11 @@
       channel = "";
       return;
     }
+    if (ch !== channel) C.emoteOnly = undefined;
     channel = ch;
-    browser.runtime.sendMessage({ type: "irc:sub", channel: ch }).catch(() => {});
+    browser.runtime.sendMessage({ type: "irc:sub", channel: ch })
+      .then((r) => { if (r && typeof r.emoteOnly === "boolean" && channel === ch) C.emoteOnly = r.emoteOnly; })
+      .catch(() => {});
   }
 
   browser.runtime.onMessage.addListener((msg) => {
@@ -787,6 +790,7 @@
       else if (ev.k === "del") onDelete(ev);
       else if (ev.k === "ban") onBan(ev);
       else if (ev.k === "clear") onClear(ev);
+      else if (ev.k === "room" && "emoteOnly" in ev) C.emoteOnly = ev.emoteOnly;
     }
   });
 
