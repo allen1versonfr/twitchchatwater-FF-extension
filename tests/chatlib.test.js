@@ -209,3 +209,12 @@ test("unmutePlaylist leaves master playlists and clean playlists alone", () => {
   assert.deepEqual(L.unmutePlaylist("#EXTM3U\n0.ts\n").swaps, []);
   assert.deepEqual(L.unmutePlaylist("not a playlist 1-muted.ts").swaps, []);
 });
+
+test("ircEvent reports emote-only mode from ROOMSTATE when it's included", () => {
+  const full = L.ircEvent(L.parseIrc("@emote-only=1;room-id=5;slow=0 :tmi.twitch.tv ROOMSTATE #chan"));
+  assert.deepEqual(full, { k: "room", ch: "chan", room: "5", emoteOnly: true });
+  const off = L.ircEvent(L.parseIrc("@emote-only=0;room-id=5 :tmi.twitch.tv ROOMSTATE #chan"));
+  assert.equal(off.emoteOnly, false);
+  const other = L.ircEvent(L.parseIrc("@slow=10;room-id=5 :tmi.twitch.tv ROOMSTATE #chan"));
+  assert.equal("emoteOnly" in other, false);
+});

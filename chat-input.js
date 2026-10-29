@@ -91,6 +91,20 @@
     return true;
   }
 
+  // Adds `text` at the very end of the message, exactly as given (no padding).
+  function append(text) {
+    const b = box();
+    if (!b) return false;
+    if (b.tagName === "TEXTAREA" || b.tagName === "INPUT") {
+      setTextarea(b, b.value + text);
+      return true;
+    }
+    b.focus();
+    caretAtEnd(b);
+    insertText(text);
+    return true;
+  }
+
   // Replaces everything in the box.
   function set(text) {
     const b = box();
@@ -218,5 +232,5 @@
     return { left: r.left, right: r.right, bottom: window.innerHeight - top + 6 };
   }
 
-  globalThis.TCWChat.input = { INPUT_SEL, box, isBox, value, insert, set, wordBefore, replaceWord, send, toolbar, popupAnchor };
+  globalThis.TCWChat.input = { INPUT_SEL, SEND_SEL, box, isBox, value, insert, append, set, wordBefore, replaceWord, send, toolbar, popupAnchor };
 })();

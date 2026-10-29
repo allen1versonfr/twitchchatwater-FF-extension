@@ -48,12 +48,14 @@ var TCW = (() => {
     emoteLive: true,           // live emote updates (7TV, BTTV; FFZ every 10 min) with a line in chat
     emoteMenu: true,           // emote button next to the chat box (favorites, recent, most used, 7TV)
     emoteColon: true,          // ";kek" suggestions while typing (key name kept so existing settings carry over)
+    emoteSugAlways: false,     // suggest matching emotes for every word you type, no ";" needed (Tab inserts)
     emoteTab: true,            // Tab cycles through matching emotes
     emoteSpam: true,           // offer a button to join in when an emote is being spammed
     spamMin: 6,                // messages with the same emote within 10 s ...
     spamUsers: 4,              // ... from at least this many people
     spamOpacity: 100,          // % opacity of the emote-spam popup (10 = almost clear, 100 = solid)
     inputHistory: true,        // Up/Down in an empty chat box recalls what you sent
+    dupBypass: true,           // let you send the same message twice in 30 s (adds an invisible character, like 7TV)
     hlWords: "",               // highlight messages containing these words (one per line, /regex/ allowed)
     hlColor: "#ff9f1a",
     hlSound: "ping",           // sound for highlighted words; "none" = silent

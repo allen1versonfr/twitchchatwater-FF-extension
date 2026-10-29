@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.6.0
+
+- **Bypass duplicate message check** (like 7TV): send the same message again within 30 seconds. Every other repeat
+  gets an invisible character at the end so Twitch accepts it. Works with Enter and the Chat button. It's skipped in
+  emote-only chat, where Twitch would reject the invisible character as text (the emote-spam button now does the
+  same). On by default; Chat → Emotes → Bypass duplicate message check.
+- **Suggest emotes as you type** (like 7TV): matching emotes pop up for every word, no `;` needed. Tab inserts the
+  highlighted one, ↑/↓ pick, Esc hides them for that word, and Enter still sends your message as typed. Off by
+  default; Chat → Emotes → Suggest emotes as you type. Commands (`/ban …`) and @mentions are left alone.
+
 ## 3.5.2
 
 - **Fixed VOD unmute not working.** It now also listens on Twitch's newer video hosts (twitchcdn.net and others), works

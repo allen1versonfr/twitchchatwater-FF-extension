@@ -510,7 +510,8 @@
     const text = Array(copies).fill(row.name).join(" ");
     const now = Date.now();
     const repeat = lastSent.text === text && now - lastSent.t < 30000;
-    const alt = repeat ? !lastSent.alt : false;
+    // the invisible character counts as text, which emote-only chat refuses
+    const alt = repeat && C.emoteOnly !== true ? !lastSent.alt : false;
     const message = alt ? text + INVISIBLE : text;
     try {
       const r = await I().send(message);
@@ -651,7 +652,8 @@
 
   // ---------- suggestions (";" and Tab) ----------
 
-  let sug = null; // { mode: "colon"|"tab", items, idx, info?, box }
+  let sug = null; // { mode: "colon"|"auto"|"tab", items, idx, word?, current? }
+  let autoDismissed = ""; // Esc closes "as you type" suggestions until you start another word
 
   function closeSug() {
     if (!sug) return;
@@ -669,14 +671,16 @@
           emoteImg(e), el("span", { class: "tcw-sug-name" }, e.name), e.tag ? el("small", {}, e.tag) : null);
         row.addEventListener("mousedown", (ev) => {
           ev.preventDefault();
-          if (sug.mode === "colon") { sug.idx = i; return acceptColon(); }
+          if (sug.mode !== "tab") { sug.idx = i; return acceptColon(); }
           const info = I().wordBefore();
           if (info && info.word === sug.current) I().replaceWord(info, e.name + " ");
           closeSug();
         });
         return row;
       }),
-      el("div", { class: "tcw-sug-hint" }, sug.mode === "tab" ? "Tab / Shift+Tab to cycle" : "↑↓ to pick · Tab or Enter to insert · Esc to close"));
+      el("div", { class: "tcw-sug-hint" }, sug.mode === "tab" ? "Tab / Shift+Tab to cycle"
+        : sug.mode === "auto" ? "Tab to insert · ↑↓ to pick · Enter sends · Esc to close"
+          : "↑↓ to pick · Tab or Enter to insert · Esc to close"));
     h.replaceChildren(box);
     placeAbove(box, sug.mode === "tab" ? 300 : 280);
     const on = box.querySelector(".tcw-on");
@@ -684,22 +688,44 @@
   }
 
   function updateColon() {
-    if (!S().emoteColon) return;
     const info = I().wordBefore();
-    const m = info && /^;([^\s;]*)$/.exec(info.word);
-    if (!m) { if (sug && sug.mode === "colon") closeSug(); return; }
-    const items = m[1] ? search(m[1], 10) : mostUsedSuggestions(10);
-    if (!items.length) { closeSug(); return; }
-    sug = { mode: "colon", items, idx: 0 };
+    const m = S().emoteColon && info && /^;([^\s;]*)$/.exec(info.word);
+    if (m) {
+      const items = m[1] ? search(m[1], 10) : mostUsedSuggestions(10);
+      if (!items.length) { closeSug(); return; }
+      sug = { mode: "colon", items, idx: 0, word: info.word };
+      drawSug();
+      return;
+    }
+    if (autoSuggest(info)) return;
+    if (sug && sug.mode !== "tab") closeSug();
+  }
+
+  // "Suggest emotes as you type": emotes starting with the word being typed, no ";" needed.
+  function autoSuggest(info) {
+    if (!S().emoteSugAlways || !info) return false;
+    const word = info.word || "";
+    if (autoDismissed && !word.startsWith(autoDismissed)) autoDismissed = "";
+    if (word.length < 2 || autoDismissed || /^[@/;:!]/.test(word) || /^\//.test(info.textBefore || "")) return false;
+    const lw = word.toLowerCase();
+    const items = search(word, 30).filter((e) => e.name.toLowerCase().startsWith(lw)).slice(0, 8);
+    if (!items.length || (items.length === 1 && items[0].name === word)) return false;
+    const keep = sug && sug.mode === "auto" && sug.items[sug.idx] && items.findIndex((e) => e.name === sug.items[sug.idx].name);
+    sug = { mode: "auto", items, idx: keep > 0 ? keep : 0, word };
     drawSug();
+    return true;
   }
 
   function acceptColon() {
     if (!sug) return;
     const e = sug.items[sug.idx];
+    const mode = sug.mode;
     const info = I().wordBefore();
     closeSug();
-    if (e && info && info.word.startsWith(";")) I().replaceWord(info, e.name + " ");
+    if (!e || !info) return;
+    if (mode === "colon" ? info.word.startsWith(";") : info.word && e.name.toLowerCase().startsWith(info.word.toLowerCase())) {
+      I().replaceWord(info, e.name + " ");
+    }
   }
 
   function tabComplete(back) {
@@ -723,6 +749,30 @@
     return true;
   }
 
+  // ---------- bypass duplicate message check ----------
+  // Twitch refuses the same message twice within 30 seconds. Like 7TV, every other repeat gets an invisible
+  // character at the end so it counts as a different message. Not in emote-only chat: there it's rejected as text.
+
+  const stripInvisible = (t) => String(t || "").replace(/\s*\u{E0000}/gu, "").trim();
+
+  function beforeSend() {
+    if (spamSending) return; // the emote-spam button handles its own repeats
+    const text = stripInvisible(I().value());
+    if (!text) return;
+    const now = Date.now();
+    const repeat = lastSent.text === text && now - lastSent.t < 30000;
+    const alt = !!(S().dupBypass && repeat && !lastSent.alt && C.emoteOnly !== true && !text.startsWith("/"));
+    if (alt && !I().value().includes("\u{E0000}")) I().append(INVISIBLE);
+    lastSent = { text, t: now, alt };
+  }
+
+  // the Chat button sends too
+  document.addEventListener("click", (e) => {
+    if (!I() || !e.target || !e.target.closest) return;
+    const btn = e.target.closest(I().SEND_SEL);
+    if (btn && !btn.disabled && I().box()) beforeSend();
+  }, true);
+
   // ---------- message history (Up / Down) ----------
 
   const history = [];
@@ -738,14 +788,20 @@
   function onKey(e) {
     if (!I() || !I().isBox(e.target)) return;
     const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
-    if (sug && sug.mode === "colon") {
+    if (sug && (sug.mode === "colon" || sug.mode === "auto")) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         sug.idx = (sug.idx + (e.key === "ArrowDown" ? 1 : -1) + sug.items.length) % sug.items.length;
         drawSug();
         return stop();
       }
-      if ((e.key === "Tab" || e.key === "Enter") && !e.shiftKey) { stop(); return acceptColon(); }
-      if (e.key === "Escape") { stop(); return closeSug(); }
+      // as-you-type suggestions never take Enter: it still sends the message
+      if ((e.key === "Tab" || (e.key === "Enter" && sug.mode === "colon")) && !e.shiftKey) { stop(); return acceptColon(); }
+      if (e.key === "Escape") {
+        if (sug.mode === "auto") autoDismissed = sug.word || "";
+        stop();
+        return closeSug();
+      }
+      if (e.key === "Enter") closeSug();
     }
     if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.metaKey && S().emoteTab) {
       if (tabComplete(e.shiftKey)) return stop();
@@ -754,7 +810,8 @@
       if (e.key === "Escape") return stop();
     }
     if (e.key === "Enter" && !e.shiftKey) {
-      const v = I().value().trim();
+      beforeSend();
+      const v = stripInvisible(I().value());
       if (v) {
         if (history[0] !== v) history.unshift(v);
         if (history.length > 50) history.length = 50;

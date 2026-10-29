@@ -28,6 +28,8 @@ function wantedChannels() {
   return out;
 }
 
+const emoteOnly = new Map(); // channel -> true/false, from the chat room's state
+
 function deliver(channel, ev) {
   for (const [k, s] of chatSubs) {
     if (s.channel !== channel) continue;
@@ -154,6 +156,7 @@ const irc = {
     if (!ev || !ev.ch) return;
     if (ev.k === "room") {
       roomIds.set(ev.ch, ev.room);
+      if ("emoteOnly" in ev) emoteOnly.set(ev.ch, ev.emoteOnly);
       if (this.emotes7tv) ensureEmotes(ev.ch);
     }
     if (ev.k === "ban" || ev.k === "del" || ev.k === "clear") logModEvent(ev);
@@ -389,7 +392,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       if (!CH_RE.test(channel)) chatSubs.delete(key);
       else chatSubs.set(key, { tabId: sender.tab.id, frameId: sender.frameId || 0, channel, t: Date.now() });
       irc.sync();
-      return Promise.resolve({ connected: !!irc.ready });
+      return Promise.resolve({ connected: !!irc.ready, emoteOnly: emoteOnly.get(channel) });
     }
     case "irc:unsub":
       if (sender.tab) chatSubs.delete(`${sender.tab.id}:${sender.frameId || 0}`);
