@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "3.4.3",
-  "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools and auto-claim for Twitch chat.",
+  "version": "3.5.0",
+  "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools, VOD unmute and auto-claim for Twitch chat.",
   "icons": {
     "48": "icons/icon-48.png",
     "96": "icons/icon-96.png"
@@ -12,7 +12,12 @@
     "notifications",
     "menus",
     "identity",
-    "*://*.twitch.tv/*"
+    "webRequest",
+    "webRequestBlocking",
+    "*://*.twitch.tv/*",
+    "*://*.cloudfront.net/*",
+    "*://*.ttvnw.net/*",
+    "*://*.akamaized.net/*"
   ],
   "browser_specific_settings": {
     "gecko": {
@@ -34,7 +39,8 @@
       "chatlib.js",
       "background.js",
       "bg-chat.js",
-      "bg-emotes.js"
+      "bg-emotes.js",
+      "bg-vod.js"
     ]
   },
   "content_scripts": [

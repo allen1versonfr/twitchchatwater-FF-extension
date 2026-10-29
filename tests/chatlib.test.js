@@ -190,3 +190,23 @@ test("sevenEntitlement finds the Twitch login and the personal set", () => {
   assert.equal(L.sevenEntitlement({ object: { kind: "EMOTE_SET", ref_id: "x", user: { connections: [] } } }), null);
   assert.equal(L.sevenEntitlement(null), null);
 });
+
+test("mutedSegments finds muted .ts segments and skips fMP4's restored copies", () => {
+  const ts = "#EXTM3U\n#EXTINF:10.000,\n0.ts\n#EXTINF:10.000,\n1-muted.ts\n#EXTINF:10.000,\n2-unmuted.ts\n#EXTINF:10.000,\n3.ts\n#EXTINF:10.000,\n7-muted.ts\n";
+  const segs = L.mutedSegments(ts);
+  assert.deepEqual(segs.map((s) => [s.line, s.n, s.un]), [[4, 1, false], [6, 2, true], [10, 7, false]]);
+  assert.deepEqual(L.unmuteCandidates(segs[0]), ["1.ts", "1-unmuted.ts"]);
+  assert.deepEqual(L.unmuteCandidates(segs[1]), ["2.ts"]);
+  const mp4 = "#EXTM3U\n#EXT-X-MAP:URI=\"init-0.mp4\"\n#EXTINF:2,\n5-unmuted.mp4\n#EXTINF:2,\nhttps://x.cloudfront.net/a/chunked/6-muted.mp4?t=1\n";
+  const m = L.mutedSegments(mp4);
+  assert.equal(m.length, 1);
+  assert.deepEqual(L.unmuteCandidates(m[0]), ["https://x.cloudfront.net/a/chunked/6.mp4?t=1", "https://x.cloudfront.net/a/chunked/6-unmuted.mp4?t=1"]);
+  assert.deepEqual(L.mutedSegments("#EXTM3U\n0.ts\n1.ts\n"), []);
+});
+
+test("mutedRuns groups consecutive muted segments and rewritePlaylist swaps lines", () => {
+  const text = "#EXTM3U\r\n1-muted.ts\r\n2-muted.ts\r\n5-muted.ts\r\n6-unmuted.ts";
+  const runs = L.mutedRuns(L.mutedSegments(text));
+  assert.deepEqual(runs.map((r) => r.map((s) => s.n)), [[1, 2], [5], [6]]);
+  assert.equal(L.rewritePlaylist(text, new Map([[1, "1.ts"], [2, "2.ts"]])), "#EXTM3U\r\n1.ts\r\n2.ts\r\n5-muted.ts\r\n6-unmuted.ts");
+});

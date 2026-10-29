@@ -34,7 +34,7 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
   See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
   See [Nametag paints](#nametag-paints).
-- **Player**: stream delay, refresh button, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel.
+- **Player**: stream delay, refresh button, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel, VOD unmute.
   See [Player and audio](#player-and-audio).
 - **Chat tools, moderation and auto-claim**: 7TV emotes, an emote menu, highlights, filters, deleted-message recovery and more.
   See [Chat tools](#chat-tools). They're all in the **Chat** tab.
@@ -52,6 +52,9 @@ In **Chat → Player & audio**, and from the 🎚 button in the player controls:
 - **Volume control**: scroll over the video to change the volume (Shift for fine steps, step size adjustable), middle-click to mute,
   with an on-screen volume readout. Twitch's own slider stays in sync.
 - **Volume per channel**: each channel remembers its own volume.
+- **VOD unmute**: parts of a VOD that Twitch muted play with their original audio when Twitch still has it
+  (usually within about a day of the stream). Each muted stretch is checked first and anything that's gone stays muted,
+  so playback never breaks. Turn it off under Player → Unmute VODs.
 - **Refresh button** (⟳) in the player's control bar: reloads the stream when it freezes or keeps buffering, without
   reloading the page. VODs stay where they were. If Twitch's player can't be reached, it reloads the page instead.
 
@@ -73,12 +76,13 @@ Everything here can be turned on or off in the **Chat** tab.
   popular in this chat, and the channel's and global 7TV emotes, with search. Click to add one to your message.
 - **Favorites**: right-click any emote in chat (Favorite emote) or in the menu.
 - **Usage tracking**: the emotes you send are counted (only yours, only on this computer). Your top emotes show in the menu and in the Chat tab.
-- **`:` suggestions**: type `:kek` to see matching emotes; ↑/↓ to pick, Tab or Enter to insert.
+- **`;` suggestions**: type `;kek` to see matching emotes (just `;` lists your most used); ↑/↓ to pick, Tab or Enter to insert.
 - **Tab completion carousel**: type part of an emote name and press Tab; keep pressing Tab (or Shift+Tab) to cycle through the matches.
 - **Join in on emote spam**: when several people spam the same emote (6 messages from 4 people within 10 seconds, adjustable),
   a button pops up above the chat box that sends that emote for you. Up to 3 spammed emotes show at once, and you can press
   Send as many times as you like (repeats get an invisible character so Twitch doesn't block them as duplicates).
   Nothing is ever sent without your click.
+  The popup's opacity is adjustable from almost clear to solid (Chat → Spam popup opacity); it turns solid while you hover it.
 - **Message history**: ↑/↓ in an empty chat box brings back the messages you sent in this tab.
 
 **Highlights, filters and appearance**

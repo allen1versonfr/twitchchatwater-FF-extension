@@ -1,6 +1,6 @@
 /* Emotes: 7TV, BTTV and FFZ emotes in chat (incl. 7TV personal emotes and live updates), the emote menu
  * (favorites, recent, most used, popular in chat, channel and global emotes),
- * ":" suggestions, Tab completion carousel, emote-spam "join in" button and Up/Down message history. */
+ * ";" suggestions, Tab completion carousel, emote-spam "join in" button and Up/Down message history. */
 (() => {
   "use strict";
   const C = globalThis.TCWChat;
@@ -95,7 +95,7 @@
       return { ...e, src: httpsSrc(e.src || s.src), p: e.p || s.p, tag: `used ${s.n}×` };
     });
     if (used.length) return used;
-    // A new install has no personal history yet; still make ":" useful.
+    // A new install has no personal history yet; still make ";" useful.
     const fallback = [...favs, ...recent].filter((e, i, a) => e && e.name && a.findIndex((x) => x.name === e.name) === i);
     return fallback.slice(0, limit).map((e) => ({ ...e, tag: favSet().has(e.name) ? "favorite" : "recent" }));
   }
@@ -443,6 +443,7 @@
       spamBox = el("div", { class: "tcw-spam", role: "status", "aria-label": "Emotes currently being spammed" });
       h.replaceChildren(spamBox);
     }
+    applySpamOpacity();
     const visible = new Set(spamRows.map((row) => row.name));
     for (const [name, dom] of spamDomRows) {
       if (!visible.has(name)) {
@@ -477,6 +478,14 @@
     const available = Math.max(0, window.innerHeight - anchor.bottom - 8);
     spamBox.style.maxHeight = Math.max(36, Math.min(160, available)) + "px";
     spamBox.style.overflowY = available < 112 ? "auto" : "visible";
+  }
+
+  // 0 = see-through, 100 = solid. Hovering or focusing the popup always makes it solid so it stays usable.
+  function applySpamOpacity() {
+    if (!spamBox) return;
+    const v = Number(S().spamOpacity);
+    const pct = Number.isFinite(v) ? Math.max(10, Math.min(100, v)) : 100;
+    spamBox.style.setProperty("--tcw-spam-op", String(pct / 100));
   }
 
   function repositionSpam() {
@@ -640,7 +649,7 @@
     bar.prepend(b);
   }
 
-  // ---------- suggestions (":" and Tab) ----------
+  // ---------- suggestions (";" and Tab) ----------
 
   let sug = null; // { mode: "colon"|"tab", items, idx, info?, box }
 
@@ -677,7 +686,7 @@
   function updateColon() {
     if (!S().emoteColon) return;
     const info = I().wordBefore();
-    const m = info && /^:([^\s:]*)$/.exec(info.word);
+    const m = info && /^;([^\s;]*)$/.exec(info.word);
     if (!m) { if (sug && sug.mode === "colon") closeSug(); return; }
     const items = m[1] ? search(m[1], 10) : mostUsedSuggestions(10);
     if (!items.length) { closeSug(); return; }
@@ -690,7 +699,7 @@
     const e = sug.items[sug.idx];
     const info = I().wordBefore();
     closeSug();
-    if (e && info && info.word.startsWith(":")) I().replaceWord(info, e.name + " ");
+    if (e && info && info.word.startsWith(";")) I().replaceWord(info, e.name + " ");
   }
 
   function tabComplete(back) {
@@ -705,7 +714,7 @@
     }
     const info = I().wordBefore();
     if (!info || !info.word || info.word.length < 2 || info.word.startsWith("@") || info.word.startsWith("/")) return false;
-    const items = search(info.word.replace(/^:/, ""), 30);
+    const items = search(info.word.replace(/^[:;]/, ""), 30);
     if (!items.length || (items.length === 1 && items[0].name === info.word)) return false;
     sug = { mode: "tab", items, idx: back ? items.length - 1 : 0 };
     sug.current = items[sug.idx].name;
@@ -875,6 +884,7 @@
       load7tv(C.currentChannel());
     }
     if (keys.has("emoteMenu")) ensureButton();
+    if (keys.has("spamOpacity")) applySpamOpacity();
   }
 
   window.addEventListener("keydown", onKey, true);

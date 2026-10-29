@@ -293,9 +293,13 @@ html.tw-root--theme-light .tcw-tb-btn { color: #0e0e10; }
 .tcw-spam {
   display: flex; flex-direction: column; gap: 3px; padding: 4px;
   border-color: #343438; background: rgba(24, 24, 27, .96);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, .24); animation: tcw-in .12s ease-out;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .24); animation: tcw-spam-in .12s ease-out;
   max-width: calc(100vw - 16px);
 }
+/* slide only, so the chosen opacity isn't overridden by a fade-in */
+@keyframes tcw-spam-in { from { transform: translateY(8px); } to { transform: none; } }
+.tcw-spam { opacity: var(--tcw-spam-op, 1); transition: opacity .15s ease-out; }
+.tcw-spam:hover, .tcw-spam:focus-within { opacity: 1; }
 .tcw-spam-row { display: flex; align-items: center; gap: 3px; min-width: 0; }
 .tcw-spam-pick {
   display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0;
