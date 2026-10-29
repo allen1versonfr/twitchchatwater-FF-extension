@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.5.1
+
+- **Easier settings**: a search box on the Chat and Settings tabs filters every option as you type (press `/` to jump
+  to it), and points you to matches on the other tab. Section chips at the top jump straight to a section, and every
+  section folds open or closed with one click (remembered), plus Collapse all / Expand all.
+- **VOD unmute is now in Settings**, in its own **VODs** section, next to **Player & audio** (moved from the Chat tab).
+- A dismissible **"New in this version"** card links to the new options, which carry a **New** tag.
+- Clearer section names: **Watchlist alerts** and **Watchlist highlight**.
+
 ## 3.5.0
 
 - **VOD unmute**: muted parts of VODs play with their original audio when Twitch still has the unmuted segments
