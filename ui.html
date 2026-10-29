@@ -82,7 +82,7 @@
 
     <!-- CHAT -->
     <section data-panel="chat" hidden>
-      <div class="group">
+      <div class="group" id="grp-emotes">
         <h2>Emotes</h2>
         <div class="opt"><span class="lbl">Show 7TV emotes<small>The channel's 7TV emotes and 7TV's global ones, right in chat. No 7TV extension needed.</small></span>
           <span class="switch"><input type="checkbox" data-setting="emotes7tv"><span></span></span></div>
@@ -96,7 +96,7 @@
           <span class="switch"><input type="checkbox" data-setting="emoteLive"><span></span></span></div>
         <div class="opt"><span class="lbl">Emote menu button (☺)<small>Next to the chat box: favorites, recently used, your most used, popular in this chat, 7TV</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteMenu"><span></span></span></div>
-        <div class="opt"><span class="lbl">Suggestions while typing “;”<small>Type ;kek to see matching emotes (just ; shows your most used); Tab or Enter inserts one</small></span>
+        <div class="opt"><span class="lbl">Suggestions while typing “;” <span class="new">New</span><small>Type ;kek to see matching emotes (just ; shows your most used); Tab or Enter inserts one</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteColon"><span></span></span></div>
         <div class="opt"><span class="lbl">Tab completion<small>Type part of a name and press Tab to cycle through matching emotes (Shift+Tab goes back)</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteTab"><span></span></span></div>
@@ -105,7 +105,7 @@
         <div class="opt"><span class="lbl">Spam means<small>Messages with the same emote within 10 seconds, from at least this many people</small></span>
           <input type="number" min="2" max="50" step="1" data-setting="spamMin" aria-label="Messages">
           <input type="number" min="1" max="50" step="1" data-setting="spamUsers" aria-label="People"></div>
-        <div class="opt"><span class="lbl">Spam popup opacity<small>From almost clear to solid; it turns solid while your mouse is over it</small></span>
+        <div class="opt"><span class="lbl">Spam popup opacity <span class="new">New</span><small>From almost clear to solid; it turns solid while your mouse is over it</small></span>
           <input type="range" min="10" max="100" step="5" data-setting="spamOpacity" aria-label="Spam popup opacity"><output data-for="spamOpacity"></output></div>
         <div class="opt"><span class="lbl">Message history<small>↑ / ↓ in an empty chat box brings back what you sent (this tab only)</small></span>
           <span class="switch"><input type="checkbox" data-setting="inputHistory"><span></span></span></div>
@@ -236,35 +236,6 @@
       </div>
 
       <div class="group">
-        <h2>Player &amp; audio</h2>
-        <div class="opt"><span class="lbl">Show the stream delay ⏳<small>In the player's control bar and next to the viewer count: how far behind the streamer you are. Click it to jump closer to live.</small></span>
-          <span class="switch"><input type="checkbox" data-setting="delayBadge"><span></span></span></div>
-        <div class="opt"><span class="lbl">Audio compressor<small>Quiet parts louder, loud parts quieter. A safety limiter stops clipping.</small></span>
-          <select data-setting="audioComp">
-            <option value="off">Off</option>
-            <option value="light">Light</option>
-            <option value="medium">Medium (like 7TV's)</option>
-            <option value="strong">Strong (night mode)</option>
-          </select></div>
-        <div class="opt"><span class="lbl">Volume boost<small>Above 100% for quiet streams</small></span>
-          <input type="range" min="100" max="400" step="10" data-setting="audioBoost"><output data-for="audioBoost"></output></div>
-        <div class="opt"><span class="lbl">Mono<small>Both ears get the same sound</small></span>
-          <span class="switch"><input type="checkbox" data-setting="audioMono"><span></span></span></div>
-        <div class="opt"><span class="lbl">Audio button 🎚 in the player</span>
-          <span class="switch"><input type="checkbox" data-setting="audioButton"><span></span></span></div>
-        <div class="opt"><span class="lbl">Refresh button ⟳ in the player<small>Reloads the stream when it freezes or buffers, without reloading the page</small></span>
-          <span class="switch"><input type="checkbox" data-setting="refreshButton"><span></span></span></div>
-        <div class="opt"><span class="lbl">Scroll over the video for volume<small>Shift for fine steps, middle-click to mute</small></span>
-          <span class="switch"><input type="checkbox" data-setting="wheelVolume"><span></span></span></div>
-        <div class="opt"><span class="lbl">Volume step<small>Percent per scroll</small></span>
-          <input type="number" min="1" max="25" step="1" data-setting="volumeStep"></div>
-        <div class="opt"><span class="lbl">Remember volume per channel</span>
-          <span class="switch"><input type="checkbox" data-setting="rememberVolume"><span></span></span></div>
-        <div class="opt"><span class="lbl">Unmute VODs<small>Plays the original audio of parts Twitch muted, when Twitch still has it (usually within a day of the stream). Takes effect when the VOD is (re)opened.</small></span>
-          <span class="switch"><input type="checkbox" data-setting="vodUnmute"><span></span></span></div>
-      </div>
-
-      <div class="group">
         <h2>Connection</h2>
         <div class="opt"><span class="lbl">Connect to chat directly<small>A read-only, logged-out connection to Twitch chat (like a signed-out viewer). Needed for deleted-message recovery, ban/timeout lines, the moderation log, first-time chatter marks and shared-chat hiding.</small></span>
           <span class="switch"><input type="checkbox" data-setting="ircOn"><span></span></span></div>
@@ -297,8 +268,17 @@
 
     <!-- SETTINGS -->
     <section data-panel="settings" hidden>
+      <div id="whatsNew" class="notice whats-new" hidden>
+        <div><b>New in this version</b>
+          <small><b>Unmute VODs</b> restores audio Twitch muted · emote suggestions now open with <b>;</b> · the emote-spam popup has an opacity slider.</small>
+          <span class="wn-links">
+            <button type="button" class="set-link" data-jump="settings:grp-vods">VOD settings</button>
+            <button type="button" class="set-link" data-jump="chat:grp-emotes">Emote settings</button>
+          </span></div>
+        <button type="button" id="whatsNewClose" class="icon-btn" title="Dismiss" aria-label="Dismiss">×</button>
+      </div>
       <div class="group">
-        <h2>Alerts</h2>
+        <h2>Watchlist alerts</h2>
         <div class="opt"><span class="lbl">Play a sound</span>
           <span class="switch"><input type="checkbox" data-setting="sound"><span></span></span></div>
         <div class="opt"><span class="lbl">Sound</span>
@@ -328,7 +308,7 @@
       </div>
 
       <div class="group">
-        <h2>Highlight</h2>
+        <h2>Watchlist highlight</h2>
         <div class="opt"><span class="lbl">Style</span>
           <select data-setting="highlightStyle">
             <option value="both">Background + side bar</option>
@@ -350,6 +330,39 @@
             <option value="ctrl">Ctrl+click a name</option>
             <option value="off">Never (use Twitch's card)</option>
           </select></div>
+      </div>
+
+      <div class="group" id="grp-vods">
+        <h2>VODs</h2>
+        <div class="opt"><span class="lbl">Unmute VODs <span class="new">New</span><small>Parts of a VOD that Twitch muted play with their original audio, as long as Twitch still has it (usually within about a day of the stream). Anything that's gone simply stays muted. Takes effect when a VOD is opened or reloaded.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="vodUnmute"><span></span></span></div>
+      </div>
+
+      <div class="group">
+        <h2>Player &amp; audio</h2>
+        <div class="opt"><span class="lbl">Show the stream delay ⏳<small>In the player's control bar and next to the viewer count: how far behind the streamer you are. Click it to jump closer to live.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="delayBadge"><span></span></span></div>
+        <div class="opt"><span class="lbl">Audio compressor<small>Quiet parts louder, loud parts quieter. A safety limiter stops clipping.</small></span>
+          <select data-setting="audioComp">
+            <option value="off">Off</option>
+            <option value="light">Light</option>
+            <option value="medium">Medium (like 7TV's)</option>
+            <option value="strong">Strong (night mode)</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Volume boost<small>Above 100% for quiet streams</small></span>
+          <input type="range" min="100" max="400" step="10" data-setting="audioBoost"><output data-for="audioBoost"></output></div>
+        <div class="opt"><span class="lbl">Mono<small>Both ears get the same sound</small></span>
+          <span class="switch"><input type="checkbox" data-setting="audioMono"><span></span></span></div>
+        <div class="opt"><span class="lbl">Audio button 🎚 in the player</span>
+          <span class="switch"><input type="checkbox" data-setting="audioButton"><span></span></span></div>
+        <div class="opt"><span class="lbl">Refresh button ⟳ in the player<small>Reloads the stream when it freezes or buffers, without reloading the page</small></span>
+          <span class="switch"><input type="checkbox" data-setting="refreshButton"><span></span></span></div>
+        <div class="opt"><span class="lbl">Scroll over the video for volume<small>Shift for fine steps, middle-click to mute</small></span>
+          <span class="switch"><input type="checkbox" data-setting="wheelVolume"><span></span></span></div>
+        <div class="opt"><span class="lbl">Volume step<small>Percent per scroll</small></span>
+          <input type="number" min="1" max="25" step="1" data-setting="volumeStep"></div>
+        <div class="opt"><span class="lbl">Remember volume per channel</span>
+          <span class="switch"><input type="checkbox" data-setting="rememberVolume"><span></span></span></div>
       </div>
 
       <div class="group">
@@ -455,6 +468,7 @@
 <script src="paints.js"></script>
 <script src="chatlib.js"></script>
 <script src="ui.js"></script>
+<script src="ui-settings.js"></script>
 <script src="ui-paints.js"></script>
 <script src="ui-watch.js"></script>
 <script src="ui-chat.js"></script>

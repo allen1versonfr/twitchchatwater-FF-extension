@@ -54,7 +54,7 @@ In **Chat → Player & audio**, and from the 🎚 button in the player controls:
 - **Volume per channel**: each channel remembers its own volume.
 - **VOD unmute**: parts of a VOD that Twitch muted play with their original audio when Twitch still has it
   (usually within about a day of the stream). Each muted stretch is checked first and anything that's gone stays muted,
-  so playback never breaks. Turn it off under Player → Unmute VODs.
+  so playback never breaks. Turn it off under Settings → VODs → Unmute VODs.
 - **Refresh button** (⟳) in the player's control bar: reloads the stream when it freezes or keeps buffering, without
   reloading the page. VODs stay where they were. If Twitch's player can't be reached, it reloads the page instead.
 
@@ -82,7 +82,7 @@ Everything here can be turned on or off in the **Chat** tab.
   a button pops up above the chat box that sends that emote for you. Up to 3 spammed emotes show at once, and you can press
   Send as many times as you like (repeats get an invisible character so Twitch doesn't block them as duplicates).
   Nothing is ever sent without your click.
-  The popup's opacity is adjustable from almost clear to solid (Chat → Spam popup opacity); it turns solid while you hover it.
+  The popup's opacity is adjustable from almost clear to solid (Chat → Emotes → Spam popup opacity); it turns solid while you hover it.
 - **Message history**: ↑/↓ in an empty chat box brings back the messages you sent in this tab.
 
 **Highlights, filters and appearance**
