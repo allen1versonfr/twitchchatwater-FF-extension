@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.5.0
+
+- **VOD unmute**: muted parts of VODs play with their original audio when Twitch still has the unmuted segments
+  (usually within about a day of the stream). The first segment of each muted stretch is checked before swapping, and
+  any swapped segment that fails to load falls back to the muted one, so playback never breaks. On by default
+  (Player → Unmute VODs). Needs new permissions to read Twitch's VOD playlists on its video CDNs (CloudFront, Akamai, ttvnw).
+- **Emote suggestions now open with `;`** instead of `:` (type `;kek`, or just `;` for your most used emotes).
+- **Spam popup opacity**: new slider in settings, from almost clear to solid. The popup turns solid while you hover it.
+
 ## 3.4.3
 
 - **Personalized emote autocomplete:** typing `:` opens suggestions for your most-used emotes, ranked from your own emote usage history.

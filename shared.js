@@ -38,6 +38,7 @@ var TCW = (() => {
     wheelVolume: true,         // scroll over the video for volume, middle-click to mute
     volumeStep: 5,             // % per scroll step
     rememberVolume: true,      // remember the volume for each channel
+    vodUnmute: true,           // play the original audio of muted VOD parts when Twitch still has it
     // chat tools
     ircOn: true,               // read-only, anonymous connection to Twitch chat (deleted messages, bans, first-time chatters)
     emotes7tv: true,           // show 7TV emotes (channel + global) in chat
@@ -46,11 +47,12 @@ var TCW = (() => {
     emotesPersonal: true,      // show 7TV subscribers' personal emotes on their messages
     emoteLive: true,           // live emote updates (7TV, BTTV; FFZ every 10 min) with a line in chat
     emoteMenu: true,           // emote button next to the chat box (favorites, recent, most used, 7TV)
-    emoteColon: true,          // ":kek" suggestions while typing
+    emoteColon: true,          // ";kek" suggestions while typing (key name kept so existing settings carry over)
     emoteTab: true,            // Tab cycles through matching emotes
     emoteSpam: true,           // offer a button to join in when an emote is being spammed
     spamMin: 6,                // messages with the same emote within 10 s ...
     spamUsers: 4,              // ... from at least this many people
+    spamOpacity: 100,          // % opacity of the emote-spam popup (10 = almost clear, 100 = solid)
     inputHistory: true,        // Up/Down in an empty chat box recalls what you sent
     hlWords: "",               // highlight messages containing these words (one per line, /regex/ allowed)
     hlColor: "#ff9f1a",

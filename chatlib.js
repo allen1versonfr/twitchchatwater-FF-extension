@@ -337,6 +337,51 @@
       .map(([name, s]) => ({ name, ...s }));
   }
 
+  // ---------- VOD unmute ----------
+  // Twitch mutes parts of a VOD by pointing its playlist at "123-muted.ts" (or "123-unmuted.ts", or .mp4 for newer
+  // VODs) instead of "123.ts". The original segment often still exists on the CDN for a while after the stream.
+
+  const MUTED_SEG_RE = /^([^#\s]*?)(\d+)-(un)?muted\.(ts|mp4)(\?[^\s]*)?$/;
+
+  // The muted segment lines of a media playlist: [{ line, n, prefix, ext, query, un, uri }]
+  function mutedSegments(text) {
+    const lines = String(text || "").split(/\r?\n/);
+    const fmp4 = lines.some((l) => l.startsWith("#EXT-X-MAP"));
+    const out = [];
+    lines.forEach((raw, line) => {
+      const l = raw.trim();
+      if (!l || l.startsWith("#")) return;
+      const m = MUTED_SEG_RE.exec(l);
+      // In fMP4 VODs "-unmuted" is Twitch's own restored copy; nothing to fix there.
+      if (!m || (m[3] && fmp4)) return;
+      out.push({ line, n: Number(m[2]), prefix: m[1], ext: m[4], query: m[5] || "", un: !!m[3], uri: l });
+    });
+    return out;
+  }
+
+  // Versions worth trying for a muted segment, best first: the original, then Twitch's restored "-unmuted" copy.
+  function unmuteCandidates(seg) {
+    const at = (suffix) => seg.prefix + seg.n + suffix + "." + seg.ext + seg.query;
+    return seg.un ? [at("")] : [at(""), at("-unmuted")];
+  }
+
+  // Groups muted segments into runs of consecutive numbers (one muted song is usually one run).
+  function mutedRuns(segs) {
+    const runs = [];
+    for (const s of segs) {
+      const last = runs[runs.length - 1];
+      if (last && s.n === last[last.length - 1].n + 1 && s.un === last[0].un) last.push(s);
+      else runs.push([s]);
+    }
+    return runs;
+  }
+
+  // Swaps lines of the playlist: `swaps` maps line index -> new uri.
+  function rewritePlaylist(text, swaps) {
+    const nl = /\r\n/.test(text) ? "\r\n" : "\n";
+    return String(text).split(/\r?\n/).map((l, i) => (swaps.has(i) ? swaps.get(i) : l)).join(nl);
+  }
+
   function fmtDuration(sec) {
     sec = Math.max(0, Math.round(Number(sec) || 0));
     if (sec < 60) return sec + "s";
@@ -348,7 +393,8 @@
   const API = {
     parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
     bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
-    splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration
+    splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration,
+    mutedSegments, unmuteCandidates, mutedRuns, rewritePlaylist
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;
