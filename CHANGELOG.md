@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.5.2
+
+- **Fixed VOD unmute not working.** It now also listens on Twitch's newer video hosts (twitchcdn.net and others), works
+  for requests from Twitch's player worker, swaps every muted segment right away instead of checking each stretch
+  first, and restores fMP4 VODs' muted init segment too. Originals that are already gone still fall back to the muted
+  audio. Turn on Debug logging (Settings → Data) to see what it restored in the add-on's console.
+- Needs permission for the extra Twitch video hosts, so Firefox asks once when updating.
+
 ## 3.5.1
 
 - **Easier settings**: a search box on the Chat and Settings tabs filters every option as you type (press `/` to jump

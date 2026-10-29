@@ -53,8 +53,8 @@ In **Chat → Player & audio**, and from the 🎚 button in the player controls:
   with an on-screen volume readout. Twitch's own slider stays in sync.
 - **Volume per channel**: each channel remembers its own volume.
 - **VOD unmute**: parts of a VOD that Twitch muted play with their original audio when Twitch still has it
-  (usually within about a day of the stream). Each muted stretch is checked first and anything that's gone stays muted,
-  so playback never breaks. Turn it off under Settings → VODs → Unmute VODs.
+  (usually within about a day of the stream). Anything that's already gone falls back to the muted audio, so playback
+  never breaks. Turn it off under Settings → VODs → Unmute VODs.
 - **Refresh button** (⟳) in the player's control bar: reloads the stream when it freezes or keeps buffering, without
   reloading the page. VODs stay where they were. If Twitch's player can't be reached, it reloads the page instead.
 

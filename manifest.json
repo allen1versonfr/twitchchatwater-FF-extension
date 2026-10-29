@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Twitch Chat Watcher",
-  "version": "3.5.1",
+  "version": "3.5.2",
   "description": "Watchlist alerts, 7TV emotes, emote menu, highlights, filters, deleted-message recovery, moderation tools, VOD unmute and auto-claim for Twitch chat.",
   "icons": {
     "48": "icons/icon-48.png",
@@ -17,7 +17,10 @@
     "*://*.twitch.tv/*",
     "*://*.cloudfront.net/*",
     "*://*.ttvnw.net/*",
-    "*://*.akamaized.net/*"
+    "*://*.akamaized.net/*",
+    "*://*.twitchcdn.net/*",
+    "*://*.jtvnw.net/*",
+    "*://*.live-video.net/*"
   ],
   "browser_specific_settings": {
     "gecko": {
