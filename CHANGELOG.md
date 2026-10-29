@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.7.0
+
+- **Emote suggestions learn from you.** `;`, as-you-type, Tab completion and emote-menu search now rank by:
+  what you send (recent use counts more, old use slowly fades), what you send **in this channel**, which emote you
+  picked for what you typed (pick KEKHeim after typing `ke` and it comes first for `ke` next time), and what chat is
+  spamming right now. Each suggestion says why: "your pick", "used 6× here", "used 20×", "popular in chat".
+  Everything stays on this computer; Reset emote usage clears it.
+- **Emote-only chat:** Twitch's servers only accept Twitch emotes from viewers there, so 7TV/BTTV/FFZ emotes can't be
+  sent by any extension. Suggestions now put Twitch emotes first and mark the others "won't send in emote-only", and the
+  emote-spam button only offers emotes you can send. **Moderators and the broadcaster** are exempt from emote-only, so
+  for them 7TV emotes and the duplicate-message bypass keep working as normal.
+
 ## 3.6.0
 
 - **Bypass duplicate message check** (like 7TV): send the same message again within 30 seconds. Every other repeat

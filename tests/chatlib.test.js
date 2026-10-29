@@ -218,3 +218,58 @@ test("ircEvent reports emote-only mode from ROOMSTATE when it's included", () =>
   const other = L.ircEvent(L.parseIrc("@slow=10;room-id=5 :tmi.twitch.tv ROOMSTATE #chan"));
   assert.equal("emoteOnly" in other, false);
 });
+
+test("rankEmotes learns from use, this channel, picks and chat, and keeps prefix matches first", () => {
+  const now = Date.UTC(2026, 9, 30);
+  const day = 86400000;
+  const cands = [
+    { name: "KEKW", p: "7tv" }, { name: "KEKHeim", p: "bttv" }, { name: "Kappa", p: "twitch" },
+    { name: "OMEGALUL", p: "7tv" }, { name: "pepeKEK", p: "7tv" }
+  ];
+  const names = (r) => r.map((x) => x.e.name);
+
+  // nothing learned yet: prefix matches before substring matches, shorter first
+  assert.deepEqual(names(L.rankEmotes(cands, "ke", { now })), ["KEKW", "KEKHeim", "pepeKEK"]);
+
+  // you send KEKHeim a lot (recently) -> it moves up
+  const stats = { KEKHeim: { n: 20, last: now - day } };
+  assert.deepEqual(names(L.rankEmotes(cands, "ke", { now, stats })).slice(0, 2), ["KEKHeim", "KEKW"]);
+
+  // old use fades but still counts
+  const oldStats = { KEKHeim: { n: 3, last: now - 200 * day } };
+  const fresh = L.rankEmotes(cands, "ke", { now, stats: { KEKHeim: { n: 3, last: now } } })[0].score;
+  const faded = L.rankEmotes(cands, "ke", { now, stats: oldStats }).find((x) => x.e.name === "KEKHeim").score;
+  assert.ok(faded < fresh);
+
+  // what you use in this channel beats your overall habits
+  let learn = L.learnRecord({}, { channel: "chan", used: Array(6).fill("KEKW") }, now);
+  const here = L.rankEmotes(cands, "ke", { now, stats, learn, channel: "chan" });
+  assert.equal(here[0].e.name, "KEKW");
+  assert.equal(here[0].why, "used 6× here");
+
+  // picking a suggestion for what you typed makes it first for that text (and close variants)
+  learn = L.learnRecord(learn, { pick: { typed: "ke", name: "pepeKEK" } }, now);
+  learn = L.learnRecord(learn, { pick: { typed: "ke", name: "pepeKEK" } }, now);
+  assert.equal(L.rankEmotes(cands, "ke", { now, stats, learn, channel: "chan" })[0].e.name, "pepeKEK");
+  assert.equal(L.rankEmotes(cands, "kek", { now, learn })[0].e.name, "pepeKEK");
+  assert.equal(L.rankEmotes(cands, "ke", { now, learn })[0].why, "your pick");
+
+  // chat's current favorite helps when you have no history
+  const popular = new Map([["KEKHeim", { n: 40, last: now - 1000 }]]);
+  assert.equal(L.rankEmotes(cands, "ke", { now, popular })[0].e.name, "KEKHeim");
+
+  // emote-only: Twitch emotes first
+  assert.equal(L.rankEmotes(cands, "", { now, stats, emoteOnly: true })[0].e.name, "Kappa");
+});
+
+test("learnRecord keeps its storage bounded", () => {
+  let learn = {};
+  for (let i = 0; i < 80; i++) learn = L.learnRecord(learn, { channel: "c" + i, used: ["A"] }, i);
+  assert.equal(Object.keys(learn.ch).length, 60);
+  assert.ok(!learn.ch.c0 && learn.ch.c79);
+  for (let i = 0; i < 300; i++) learn = L.learnRecord(learn, { channel: "c79", used: ["E" + i] }, 1000 + i);
+  assert.equal(Object.keys(learn.ch.c79).length, 250);
+  for (let i = 0; i < 20; i++) learn = L.learnRecord(learn, { pick: { typed: "k", name: "N" + i } }, i);
+  assert.equal(Object.keys(learn.picks.k).length, 8);
+  assert.equal(L.learnRecord(null, {}).ch && true, true);
+});

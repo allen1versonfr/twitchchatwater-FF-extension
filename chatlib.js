@@ -339,6 +339,110 @@
       .map(([name, s]) => ({ name, ...s }));
   }
 
+  // ---------- learning emote suggestions ----------
+  // Suggestions get better the more you chat: what you send (recent use counts more than old use), what you send
+  // in this channel, which suggestion you picked for what you typed, and what chat is using right now.
+  // learn = { ch: { channel: { name: { n, last } } }, picks: { typed: { name: { n, last } } } }
+
+  const HALF_LIFE = 14 * 86400000;
+  const LEARN_CAPS = { channels: 60, perChannel: 250, picks: 600, perPick: 8 };
+
+  function recency(last, now) {
+    return last ? Math.pow(0.5, Math.max(0, now - last) / HALF_LIFE) : 0;
+  }
+
+  // log-scaled count, faded by how long ago it was last used (never below a third, so old favorites still count)
+  function useScore(s, now) {
+    const n = s && Number(s.n);
+    return n > 0 ? Math.log2(1 + n) * (0.35 + 0.65 * recency(Number(s.last) || 0, now)) : 0;
+  }
+
+  function bump(map, key, now) {
+    const s = map[key] || (map[key] = { n: 0, last: 0 });
+    s.n++;
+    s.last = now;
+  }
+
+  function trim(map, cap) {
+    const keys = Object.keys(map);
+    if (keys.length <= cap) return;
+    const lastOf = (k) => { const v = map[k]; return v && typeof v.last === "number" ? v.last : Math.max(0, ...Object.values(v || {}).map((x) => (x && x.last) || 0)); };
+    keys.sort((a, b) => lastOf(a) - lastOf(b));
+    for (const k of keys.slice(0, keys.length - cap)) delete map[k];
+  }
+
+  // Records emotes you sent in `channel` and/or a suggestion you picked (`pick: { typed, name }`). Returns `learn`.
+  function learnRecord(learn, ev, now = Date.now()) {
+    learn = learn && typeof learn === "object" ? learn : {};
+    learn.ch = learn.ch && typeof learn.ch === "object" ? learn.ch : {};
+    learn.picks = learn.picks && typeof learn.picks === "object" ? learn.picks : {};
+    const ch = String(ev.channel || "").toLowerCase();
+    if (ch && Array.isArray(ev.used) && ev.used.length) {
+      const m = learn.ch[ch] || (learn.ch[ch] = {});
+      for (const name of ev.used) if (name) bump(m, name, now);
+      trim(m, LEARN_CAPS.perChannel);
+      trim(learn.ch, LEARN_CAPS.channels);
+    }
+    const typed = ev.pick && String(ev.pick.typed || "").toLowerCase().slice(0, 16);
+    if (typed && ev.pick.name) {
+      const m = learn.picks[typed] || (learn.picks[typed] = {});
+      bump(m, ev.pick.name, now);
+      trim(m, LEARN_CAPS.perPick);
+      trim(learn.picks, LEARN_CAPS.picks);
+    }
+    return learn;
+  }
+
+  // Orders emote candidates ({ name, p, ... }) for what's being typed (`q`; "" = no filter).
+  // ctx: { stats, learn, channel, popular: Map|object name -> { n, last }, favs: Set, now, emoteOnly }
+  // emoteOnly: chat only takes Twitch emotes from you, so those go first. Returns [{ e, score, why }] best first.
+  function rankEmotes(cands, q, ctx = {}) {
+    const now = ctx.now || Date.now();
+    const lq = String(q || "").toLowerCase();
+    const stats = ctx.stats || {};
+    const learn = ctx.learn || {};
+    const here = (learn.ch && learn.ch[String(ctx.channel || "").toLowerCase()]) || {};
+    const picks = learn.picks || {};
+    const pop = ctx.popular instanceof Map ? ctx.popular : new Map(Object.entries(ctx.popular || {}));
+    const favs = ctx.favs || new Set();
+    // picks for exactly this text count most, then for shorter or longer versions of it
+    const pickSets = [];
+    if (lq) {
+      for (const [typed, m] of Object.entries(picks)) {
+        if (typed === lq) pickSets.push([m, 3]);
+        else if (lq.startsWith(typed)) pickSets.push([m, 1.2 * typed.length / lq.length]);
+        else if (typed.startsWith(lq)) pickSets.push([m, 0.8]);
+      }
+    }
+    const out = [];
+    for (const e of cands) {
+      if (!e || !e.name) continue;
+      const ln = e.name.toLowerCase();
+      let tier = 0;
+      if (lq) {
+        if (e.name.startsWith(q)) tier = 0;
+        else if (ln.startsWith(lq)) tier = 0.4;
+        else if (ln.includes(lq)) tier = 3;
+        else continue;
+      }
+      const mine = useScore(stats[e.name], now);
+      const chan = useScore(here[e.name], now);
+      let picked = 0;
+      for (const [m, w] of pickSets) picked += w * useScore(m[e.name], now);
+      const p = pop.get(e.name);
+      const chat = p && p.n > 0 ? 0.5 * Math.log2(1 + p.n) * (p.last && now - p.last < 120000 ? 1.5 : 1) : 0;
+      let score = 1.2 * mine + 2 * chan + 2.5 * picked + chat + (favs.has(e.name) ? 1 : 0) - tier - 0.03 * e.name.length;
+      if (ctx.emoteOnly) score += e.p === "twitch" ? 4 : -4;
+      const why = picked > 0 ? "your pick"
+        : chan > 0 ? `used ${here[e.name].n}× here`
+          : mine > 0 ? `used ${stats[e.name].n}×`
+            : chat > 0 ? "popular in chat" : "";
+      out.push({ e, score, why });
+    }
+    out.sort((a, b) => b.score - a.score || a.e.name.localeCompare(b.e.name));
+    return out;
+  }
+
   // ---------- VOD unmute ----------
   // Twitch mutes parts of a VOD by pointing its playlist at "123-muted.ts" (or "123-muted.mp4" and an
   // "init-0-muted.mp4" map for newer VODs) instead of the original file, which often stays on the CDN for a while.
@@ -385,7 +489,7 @@
     parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
     bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
     splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration,
-    unmutePlaylist
+    unmutePlaylist, learnRecord, rankEmotes
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

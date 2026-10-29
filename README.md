@@ -77,6 +77,8 @@ Everything here can be turned on or off in the **Chat** tab.
 - **Favorites**: right-click any emote in chat (Favorite emote) or in the menu.
 - **Usage tracking**: the emotes you send are counted (only yours, only on this computer). Your top emotes show in the menu and in the Chat tab.
 - **`;` suggestions**: type `;kek` to see matching emotes (just `;` lists your most used); ↑/↓ to pick, Tab or Enter to insert.
+- **Suggestions that learn**: ranked by what you send (recent use counts more), what you send in this channel, which emote you picked
+  for what you typed, and what chat is spamming right now. Stays on this computer.
 - **Suggest emotes as you type** (optional, like 7TV): matching emotes pop up for every word without typing `;`; Tab inserts, Enter still sends.
 - **Tab completion carousel**: type part of an emote name and press Tab; keep pressing Tab (or Shift+Tab) to cycle through the matches.
 - **Join in on emote spam**: when several people spam the same emote (6 messages from 4 people within 10 seconds, adjustable),
@@ -85,7 +87,8 @@ Everything here can be turned on or off in the **Chat** tab.
   Nothing is ever sent without your click.
   The popup's opacity is adjustable from almost clear to solid (Chat → Emotes → Spam popup opacity); it turns solid while you hover it.
 - **Bypass duplicate message check** (like 7TV): send the same message twice within 30 seconds; every other repeat gets an
-  invisible character so Twitch accepts it. Skipped in emote-only chat, where Twitch would reject it.
+  invisible character so Twitch accepts it. Skipped in emote-only chat, where Twitch would reject it (moderators and the
+  broadcaster are exempt from emote-only, so it keeps working for them).
 - **Message history**: ↑/↓ in an empty chat box brings back the messages you sent in this tab.
 
 **Highlights, filters and appearance**
