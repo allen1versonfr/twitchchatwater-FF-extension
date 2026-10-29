@@ -245,10 +245,10 @@ function cleanEmote(e) {
   return { name, src, p: ["7tv", "bttv", "ffz"].includes(e.p) ? e.p : "twitch" };
 }
 
-async function emotesUsed(list) {
+async function emotesUsed(list, channel) {
   const used = (Array.isArray(list) ? list : []).slice(0, 50).map(cleanEmote).filter(Boolean);
   if (!used.length) return;
-  const d = await browser.storage.local.get(["emoteStats", "emoteRecent"]);
+  const d = await browser.storage.local.get(["emoteStats", "emoteRecent", "emoteLearn"]);
   const stats = d.emoteStats && typeof d.emoteStats === "object" ? d.emoteStats : {};
   let recent = Array.isArray(d.emoteRecent) ? d.emoteRecent : [];
   const now = Date.now();
@@ -265,7 +265,17 @@ async function emotesUsed(list) {
     names.sort((a, b) => stats[a].n - stats[b].n || stats[a].last - stats[b].last);
     for (const n of names.slice(0, names.length - 500)) delete stats[n];
   }
-  await browser.storage.local.set({ emoteStats: stats, emoteRecent: recent.slice(0, 36) });
+  const learn = CH_RE.test(String(channel || "")) ? L.learnRecord(d.emoteLearn, { channel, used: used.map((e) => e.name) }, now) : d.emoteLearn;
+  await browser.storage.local.set({ emoteStats: stats, emoteRecent: recent.slice(0, 36), emoteLearn: learn || {} });
+}
+
+// You picked `name` from the suggestions after typing `typed`: next time it comes first for that.
+async function emotePicked(typed, name) {
+  typed = String(typed || "").slice(0, 16);
+  name = String(name || "").slice(0, 100);
+  if (!typed || !name || /\s/.test(name)) return;
+  const d = await browser.storage.local.get("emoteLearn");
+  await browser.storage.local.set({ emoteLearn: L.learnRecord(d.emoteLearn, { pick: { typed, name } }) });
 }
 
 async function toggleFavorite(e, on) {
@@ -401,11 +411,13 @@ browser.runtime.onMessage.addListener((msg, sender) => {
     case "irc:state":
       return Promise.resolve({ connected: !!irc.ready, channels: [...irc.joined] });
     case "emotes:used":
-      return serial(() => emotesUsed(msg.emotes));
+      return serial(() => emotesUsed(msg.emotes, msg.channel));
+    case "emotes:pick":
+      return serial(() => emotePicked(msg.typed, msg.name));
     case "emotes:fav":
       return serial(() => toggleFavorite(msg.emote, msg.on));
     case "emotes:resetStats":
-      return serial(() => browser.storage.local.set({ emoteStats: {}, emoteRecent: [] }));
+      return serial(() => browser.storage.local.set({ emoteStats: {}, emoteRecent: [], emoteLearn: {} }));
     case "keyword":
       return serial(() => onKeyword(msg, sender));
     case "modlog:clear":

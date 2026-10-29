@@ -17,6 +17,7 @@
   let favs = [];
   let recent = [];
   let stats = {};
+  let learn = {}; // what suggestions have learned from you (see TCWChatLib.rankEmotes)
   const twitchSeen = new Map(); // name -> src (emotes seen in chat this session)
   let popular = new Map(); // name -> { n, src, p, last }  (this channel, this session)
   let navAt = Date.now();
@@ -63,37 +64,37 @@
     return out;
   }
 
-  function search(q, limit) {
-    if (!q) return [];
-    const lq = q.toLowerCase();
-    const fav = favSet();
-    const scored = [];
-    for (const e of catalog().values()) {
-      const ln = e.name.toLowerCase();
-      let score;
-      if (e.name.startsWith(q)) score = 0;
-      else if (ln.startsWith(lq)) score = 1;
-      else if (ln.includes(lq)) score = 2;
-      else continue;
-      const usage = stats[e.name] || {};
-      const uses = Number(usage.n) || 0;
-      scored.push({
-        e: { ...e, tag: uses > 0 ? `used ${uses}×` : e.tag },
-        score, uses, last: Number(usage.last) || 0, fav: fav.has(e.name) ? 0 : 1
-      });
-    }
-    // Keep prefix matches ahead of substring matches, but personalize each group
-    // by the emotes the user actually sends most often.
-    scored.sort((a, b) => a.score - b.score || b.uses - a.uses || b.last - a.last || a.fav - b.fav || a.e.name.length - b.e.name.length);
-    return scored.slice(0, limit).map((x) => x.e);
+  // Emote-only chat only lets you send Twitch emotes, unless you're a moderator or the broadcaster.
+  function emoteOnlyForMe() {
+    return C.emoteOnly === true && !(C.isMod && C.isMod());
   }
 
+  function rankCtx() {
+    return { stats, learn, channel: C.currentChannel(), popular, favs: favSet(), emoteOnly: emoteOnlyForMe() };
+  }
+
+  function labeled(r, restricted) {
+    const tag = restricted && r.e.p !== "twitch" ? "won't send in emote-only" : r.why || r.e.tag;
+    return { ...r.e, tag };
+  }
+
+  // Matching emotes, best first, learned from how you chat.
+  function search(q, limit) {
+    if (!q) return [];
+    const ctx = rankCtx();
+    return L.rankEmotes([...catalog().values()], q, ctx).slice(0, limit).map((r) => labeled(r, ctx.emoteOnly));
+  }
+
+  // What ";" shows before you type a name: your emotes for this channel and right now.
   function mostUsedSuggestions(limit = 10) {
     const all = catalog();
-    const used = L.topEmotes(stats, limit).map((s) => {
-      const e = all.get(s.name) || { name: s.name, src: s.src, p: s.p };
-      return { ...e, src: httpsSrc(e.src || s.src), p: e.p || s.p, tag: `used ${s.n}×` };
+    const ctx = rankCtx();
+    const names = new Set([...Object.keys(stats), ...Object.keys((learn.ch && learn.ch[ctx.channel]) || {})]);
+    const cands = [...names].map((n) => {
+      const e = all.get(n) || { name: n, src: (stats[n] || {}).src, p: (stats[n] || {}).p };
+      return { ...e, src: httpsSrc(e.src || (stats[n] || {}).src), p: e.p || (stats[n] || {}).p };
     });
+    const used = L.rankEmotes(cands, "", ctx).slice(0, limit).map((r) => labeled(r, ctx.emoteOnly));
     if (used.length) return used;
     // A new install has no personal history yet; still make ";" useful.
     const fallback = [...favs, ...recent].filter((e, i, a) => e && e.name && a.findIndex((x) => x.name === e.name) === i);
@@ -278,7 +279,7 @@
     }
     if (Date.now() - navAt < 6000) return; // history Twitch loads when you open a channel
     if (mine) {
-      browser.runtime.sendMessage({ type: "emotes:used", emotes: found }).catch(() => {});
+      browser.runtime.sendMessage({ type: "emotes:used", emotes: found, channel: C.currentChannel() }).catch(() => {});
       return;
     }
     if (S().emoteSpam && S().enabled) {
@@ -353,7 +354,10 @@
     for (const name of spamDismissed) if (!activeNames.has(name)) spamDismissed.delete(name);
     const previous = new Map(spamRows.map((r) => [r.name, r]));
     const currentEmotes = new Map(found.map((e) => [e.name, e]));
-    spamRows = active.filter((hit) => !spamDismissed.has(hit.name)).slice(0, SPAM_MAX).map((hit) => {
+    const providerOfHit = (name) => (currentEmotes.get(name) || popular.get(name) || {}).p;
+    // In emote-only chat only Twitch emotes can be sent (moderators and the broadcaster can send anything).
+    const sendable = (hit) => !emoteOnlyForMe() || providerOfHit(hit.name) === "twitch";
+    spamRows = active.filter((hit) => !spamDismissed.has(hit.name) && sendable(hit)).slice(0, SPAM_MAX).map((hit) => {
       const old = previous.get(hit.name);
       return {
         name: hit.name,
@@ -511,7 +515,7 @@
     const now = Date.now();
     const repeat = lastSent.text === text && now - lastSent.t < 30000;
     // the invisible character counts as text, which emote-only chat refuses
-    const alt = repeat && C.emoteOnly !== true ? !lastSent.alt : false;
+    const alt = repeat && !emoteOnlyForMe() ? !lastSent.alt : false;
     const message = alt ? text + INVISIBLE : text;
     try {
       const r = await I().send(message);
@@ -657,6 +661,10 @@
 
   function closeSug() {
     if (!sug) return;
+    if (sug.mode === "tab" && sug.current && sug.typed) {
+      const info = I().wordBefore();
+      if (info && info.word === sug.current) learnPick(sug.typed, sug.current);
+    }
     const h = document.getElementById("tcw-sug-host");
     if (h) h.replaceChildren();
     sug = null;
@@ -725,7 +733,15 @@
     if (!e || !info) return;
     if (mode === "colon" ? info.word.startsWith(";") : info.word && e.name.toLowerCase().startsWith(info.word.toLowerCase())) {
       I().replaceWord(info, e.name + " ");
+      learnPick(info.word.replace(/^;/, ""), e.name);
     }
+  }
+
+  // Remember which emote you chose for what you typed, so it's offered first next time.
+  function learnPick(typed, name) {
+    if (!typed || !name) return;
+    learn = L.learnRecord(learn, { pick: { typed, name } }); // show it right away; the background saves it
+    browser.runtime.sendMessage({ type: "emotes:pick", typed, name }).catch(() => {});
   }
 
   function tabComplete(back) {
@@ -742,7 +758,7 @@
     if (!info || !info.word || info.word.length < 2 || info.word.startsWith("@") || info.word.startsWith("/")) return false;
     const items = search(info.word.replace(/^[:;]/, ""), 30);
     if (!items.length || (items.length === 1 && items[0].name === info.word)) return false;
-    sug = { mode: "tab", items, idx: back ? items.length - 1 : 0 };
+    sug = { mode: "tab", items, idx: back ? items.length - 1 : 0, typed: info.word.replace(/^[:;]/, "") };
     sug.current = items[sug.idx].name;
     I().replaceWord(info, sug.current);
     drawSug();
@@ -761,7 +777,7 @@
     if (!text) return;
     const now = Date.now();
     const repeat = lastSent.text === text && now - lastSent.t < 30000;
-    const alt = !!(S().dupBypass && repeat && !lastSent.alt && C.emoteOnly !== true && !text.startsWith("/"));
+    const alt = !!(S().dupBypass && repeat && !lastSent.alt && !emoteOnlyForMe() && !text.startsWith("/"));
     if (alt && !I().value().includes("\u{E0000}")) I().append(INVISIBLE);
     lastSent = { text, t: now, alt };
   }
@@ -891,7 +907,8 @@
   // ---------- wiring ----------
 
   function loadStored() {
-    return browser.storage.local.get(["emoteFavs", "emoteRecent", "emoteStats"]).then((d) => {
+    return browser.storage.local.get(["emoteFavs", "emoteRecent", "emoteStats", "emoteLearn"]).then((d) => {
+      learn = d.emoteLearn && typeof d.emoteLearn === "object" ? d.emoteLearn : {};
       favs = Array.isArray(d.emoteFavs) ? d.emoteFavs : [];
       recent = Array.isArray(d.emoteRecent) ? d.emoteRecent : [];
       stats = d.emoteStats && typeof d.emoteStats === "object" ? d.emoteStats : {};
@@ -899,6 +916,7 @@
   }
 
   browser.storage.onChanged.addListener((ch, area) => {
+    if (area === "local" && ch.emoteLearn) learn = ch.emoteLearn.newValue || {};
     if (area !== "local" || !(ch.emoteFavs || ch.emoteRecent || ch.emoteStats)) return;
     if (ch.emoteFavs) favs = ch.emoteFavs.newValue || [];
     if (ch.emoteRecent) recent = ch.emoteRecent.newValue || [];
