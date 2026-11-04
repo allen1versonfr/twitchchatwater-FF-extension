@@ -114,6 +114,14 @@
       try { f(...args); } catch (e) { debug("hook failed", kind, e); }
     }
   }
+  // For reading a message aloud: whether this tab is out of view, and the text without emote names.
+  function speechInfo(line, text) {
+    const em = globalThis.TCWChat && globalThis.TCWChat.emotes;
+    let plain = text;
+    try { if (em) plain = em.withoutEmotes(line, text); } catch (e) { /* keep the full text */ }
+    return { hidden: document.hidden, plain };
+  }
+
   globalThis.TCWChat = {
     hooks, attach, LINE_SEL, NAME_SEL, BODY_SEL, CONTAINER_SEL,
     get settings() { return settings; },
@@ -132,7 +140,8 @@
     toast: (text) => toast(text),
     jumpLocal: (id) => jumpLocal(id),
     el: (...a) => el(...a),
-    debug: (...a) => debug(...a)
+    debug: (...a) => debug(...a),
+    speechInfo: (line, text) => speechInfo(line, text)
   };
 
   // ---------- settings ----------
@@ -319,7 +328,7 @@
     browser.runtime
       .sendMessage({
         type: "hit", login: user.login, display: author.display || user.name,
-        channel: currentChannel(), text, time: now, msgId: line.dataset.tcwId || null
+        channel: currentChannel(), text, time: now, msgId: line.dataset.tcwId || null, ...speechInfo(line, text)
       })
       .then((r) => {
         if (r && r.localSound) playLocal(r.localSound.type, r.localSound.volume);
@@ -390,7 +399,7 @@
     const display = author.display || author.names[0];
     browser.runtime.sendMessage({
       type: "mention", kind, login: author.names[0], display,
-      channel: currentChannel(), text, msgId: line.dataset.tcwId || null
+      channel: currentChannel(), text, msgId: line.dataset.tcwId || null, ...speechInfo(line, text)
     }).then((r) => {
       if (r && r.localSound) playLocal(r.localSound.type, r.localSound.volume);
     }).catch(() => {

@@ -25,11 +25,14 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 - **Firefox Sync**: your watchlist and settings follow you to other computers signed in to Firefox (with **Add-ons** sync turned on).
   Message counts and activity history stay on each computer.
 - **Activity log** of everything your watchlist said, newest first.
-- **Pins tab**: a history of pinned chat messages. Messages pinned in Twitch chat are saved automatically (and stay after
-  they're unpinned); right-click any message and pick **Pin this message** to pin one yourself. Search, filter by channel or
-  by who pinned it, copy, jump back to the message. Stored only on this computer.
-- **Read aloud**: text-to-speech for your highlighted messages (optionally also watchlist messages and @mentions), by
-  default only while Firefox isn't the app you're using. Pick the voice, speed and volume in Settings → Read aloud.
+- **Pins tab**: a history of pinned chat messages. Messages pinned in Twitch chat are saved automatically, read from
+  Twitch's own data so collapsed or stacked pins aren't missed (and they stay after they're unpinned, with how long they
+  were up); Hype Chats too. Right-click any message and pick **Pin this message** to pin one yourself. Search, filter by
+  channel or by who pinned it, copy, jump back to the message, export as text. A 📌 button in chat lists the current
+  channel's pins. Stored only on this computer.
+- **Read aloud**: text-to-speech for your highlighted messages (optionally also watchlist messages and @mentions), only
+  while Firefox isn't the app you're using or the Twitch tab is out of view (your choice), or always. Emote names are left
+  out unless you turn them on, repeats are skipped, and the voice, speed and volume are yours to pick (Settings → Read aloud).
 - **Status tab** showing whether each open Twitch tab's chat is being read, plus a test button.
 - Right-click any chat message, then pick **Watch this chat user**.
 - Backup and restore your watchlist as a file.
@@ -52,7 +55,8 @@ In **Settings → Player & audio**, and from the 🎚 button in the player contr
 
 - **Stable volume**: evens out loud and quiet moments so you don't have to keep adjusting the volume. Loud parts are
   turned down within a fraction of a second, quiet parts are raised gently after a short pause (so one loud moment doesn't
-  make the next quiet line blast out), and silence is never boosted. Your own volume slider still works as usual.
+  make the next quiet line blast out), sudden very loud moments are cut at once, and silence is never boosted. Your own
+  volume slider still works as usual, and each channel's level is remembered so streams start at the right volume.
   Gentle (±6 dB), Normal (±12 dB) or Strong (±18 dB); the 🎚 menu shows how much it's adjusting right now.
 - **Stream delay** (⏳) in the player's control bar and next to the viewer count and your watch time: how far behind the
   streamer you are, from Twitch's own player (or its Video Stats, or the buffer size if neither says). Green under 4 s, yellow under 8 s, red above. Click it to jump closer to live.

@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.9.0
+
+**Pins**
+- **Fixed missed pins.** Pinned messages are now read from Twitch's own data behind the pinned card (the message, who
+  sent it and who pinned it), so pins are caught even when the card is collapsed, truncated or stacked behind a poll or
+  hype train. The old text reading is kept as a fallback, pinned cards are no longer mistaken for chat rows, and new
+  pins are noticed within a moment instead of every few seconds. Hype Chats are also saved from the chat connection.
+- Each pin shows how long it stayed up ("Pinned for 50 min") or "Pinned now"; Hype Chats are labeled.
+- **📌 button in chat** (next to the chat settings) lists this channel's pins without leaving Twitch.
+- **Export** the pinned history (or just what your search/filter shows) as a text file.
+
+**Stable volume**
+- Loudness is measured the way loudness meters do (bass counts less, presence a bit more), so it matches what you hear.
+- Sudden very loud moments (jump scares, alert sounds) are turned down at once instead of over a second.
+- Each channel's settled level is remembered, so a new stream, a refresh or your next visit starts at the right volume.
+
+**Read aloud**
+- New "When the Twitch tab isn't in view" option (another tab, minimized, or another app).
+- Emote names are left out by default ("hype KEKW KEKW" is read as "hype"; emote-only messages are skipped); turn on
+  "Read emote names" to hear them.
+- "Say who wrote it" can be turned off; the channel is only said when it changes.
+- The same message is never read twice within a minute.
+
 ## 3.8.0
 
 - **Stable volume** (Settings → Player & audio, or the player's 🎚 menu): evens out loud and quiet moments so you don't

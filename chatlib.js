@@ -69,7 +69,7 @@
       let action = false;
       const me = /^\x01ACTION (.*)\x01?$/.exec(text);
       if (me) { text = me[1].replace(/\x01$/, ""); action = true; }
-      return {
+      const ev = {
         k: "msg", ch: chan, id: t.id || "", login: (t.login || m.nick || "").toLowerCase(),
         display: t["display-name"] || m.nick, text, action, time,
         badges: parseBadges(t.badges), color: /^#[0-9a-f]{6}$/i.test(t.color || "") ? t.color : "",
@@ -77,6 +77,9 @@
         room: t["room-id"] || "", source: t["source-room-id"] || "",
         reply: t["reply-parent-user-login"] || ""
       };
+      // a Hype Chat: a paid message Twitch pins to the top of chat
+      if (t["pinned-chat-paid-amount"] && t["pinned-chat-paid-is-system-message"] !== "1") ev.paidPin = true;
+      return ev;
     }
     if (m.command === "CLEARMSG") {
       return { k: "del", ch: chan, id: t["target-msg-id"] || "", login: (t.login || "").toLowerCase(), text: m.params[1] || "", time };
@@ -466,10 +469,19 @@
     const tau = x > st.loud ? 0.15 : 0.9;
     const loud = st.loud + (x - st.loud) * (1 - Math.exp(-dt / tau));
     let { gain, hold } = st;
+    // blast guard: a sudden very loud moment (jump scare, alert sound) is pulled down at once instead of
+    // waiting for the smoothed loudness to catch up; the limiter only has to catch the first few milliseconds
+    if (x + gain > LEVEL_TARGET + 12 && x >= LEVEL_GATE) {
+      gain = Math.max(-p.down, Math.min(gain, LEVEL_TARGET + 6 - x));
+      hold = 2;
+      return { gain, loud: Math.max(loud, x - 3), hold };
+    }
     if (loud >= LEVEL_GATE) {
       const want = Math.max(-p.down, Math.min(p.up, LEVEL_TARGET - loud));
       if (want < gain) {
-        gain = Math.max(want, gain - p.downRate * dt);
+        // far too loud: come down three times as fast
+        const rate = loud + gain > LEVEL_TARGET + 8 ? p.downRate * 3 : p.downRate;
+        gain = Math.max(want, gain - rate * dt);
         hold = 1.5;
       } else if (hold > 0) {
         hold = Math.max(0, hold - dt);
@@ -483,7 +495,9 @@
   // ---------- reading messages aloud ----------
 
   // What text-to-speech says for a chat message: links shortened, emote spam collapsed, kept short.
-  function ttsText(display, channel, text, max = 200) {
+  // opts: a max length, or { max, names } (names: false = don't say who wrote it)
+  function ttsText(display, channel, text, opts = {}) {
+    const { max = 200, names = true } = typeof opts === "number" ? { max: opts } : opts || {};
     let t = String(text || "")
       .replace(/[\u200B-\u200D\uFEFF\u{E0000}]/gu, "")
       .replace(/https?:\/\/\S+|www\.\S+/gi, "link")
@@ -493,8 +507,10 @@
     const words = t.split(" ");
     t = words.filter((w, i) => i === 0 || w !== words[i - 1]).join(" ");
     if (t.length > max) t = t.slice(0, max).replace(/\s+\S*$/, "") + "…";
+    const body = t || "sent a message";
+    if (!names) return channel ? `In ${channel}: ${body}` : body;
     const who = String(display || "Someone").trim();
-    return `${who}${channel ? " in " + channel : ""}: ${t || "sent a message"}`;
+    return `${who}${channel ? " in " + channel : ""}: ${body}`;
   }
 
   // ---------- pinned messages ----------
@@ -520,15 +536,41 @@
       by: p.by === "twitch" ? "twitch" : "you"
     };
     if (p.pinner) entry.pinner = String(p.pinner).slice(0, 40);
+    if (p.pinId) entry.pinId = String(p.pinId).slice(0, 80);
+    if (entry.by === "twitch") entry.seenAt = Date.now();
+    if (p.paid) entry.paid = true;
     for (const k of ["tabId", "frameId"]) if (Number.isInteger(p[k])) entry[k] = p[k];
     if (p.msgId) entry.msgId = String(p.msgId).slice(0, 80);
     const key = pinKey(entry);
-    const old = pins.find((x) => pinKey(x) === key);
-    // seen again (Twitch keeps a pin on screen for a while): keep the first time and who pinned it
-    if (old && old.by === "twitch" && entry.by === "twitch") return { pins, added: false };
-    const rest = pins.filter((x) => pinKey(x) !== key);
+    const same = (x) => (entry.pinId && x.pinId === entry.pinId) || pinKey(x) === key;
+    const old = pins.find(same);
+    // seen again (Twitch keeps a pin up for a while, and it's read from more than one place): keep the first copy,
+    // fill in anything it was missing, and clear "ended" if it's back up
+    if (old && old.by === "twitch" && entry.by === "twitch") {
+      const merged = { ...old };
+      for (const k of ["pinId", "pinner", "paid", "msgId", "tabId", "frameId"]) if (merged[k] == null && entry[k] != null) merged[k] = entry[k];
+      if (!old.pinner && entry.pinner) merged.pinner = entry.pinner;
+      delete merged.endedAt;
+      merged.seenAt = entry.seenAt; // still up (content scripts report a visible pin every 10 minutes)
+      const changed = JSON.stringify(merged) !== JSON.stringify(old);
+      return { pins: changed ? pins.map((x) => (x === old ? merged : x)) : pins, added: false };
+    }
+    const rest = pins.filter((x) => !same(x));
     if (old) { entry.id = old.id; if (old.by === "you") entry.by = "you"; }
     return { pins: [entry, ...rest].slice(0, cap), added: !old };
+  }
+
+  // A pin Twitch took down (or that expired): remember when, so the history can say how long it was up.
+  function endPin(pins, p, now = Date.now()) {
+    pins = Array.isArray(pins) ? pins : [];
+    const key = pinKey({ ch: p.ch, login: p.login, text: String(p.text || "").replace(/\s+/g, " ").trim() });
+    let hit = false;
+    const out = pins.map((x) => {
+      if (hit || x.by !== "twitch" || x.endedAt || !((p.pinId && x.pinId === p.pinId) || pinKey(x) === key)) return x;
+      hit = true;
+      return { ...x, endedAt: now };
+    });
+    return { pins: out, ended: hit };
   }
 
   // ---------- VOD unmute ----------
@@ -577,7 +619,7 @@
     parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
     bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
     splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration,
-    unmutePlaylist, learnRecord, rankEmotes, LEVEL_PRESETS, LEVEL_TARGET, levelerStep, ttsText, pinKey, addPin
+    unmutePlaylist, learnRecord, rankEmotes, LEVEL_PRESETS, LEVEL_TARGET, levelerStep, ttsText, pinKey, addPin, endPin
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

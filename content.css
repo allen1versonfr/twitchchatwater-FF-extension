@@ -403,3 +403,22 @@ html.tw-root--theme-light .tcw-watch.tcw-delay { background: rgba(0, 173, 3, .16
   position: absolute; top: 10px; left: 10px; z-index: 10; height: 24px; line-height: 24px;
   background: rgba(0, 0, 0, .55);
 }
+
+/* ---------- 📌 pins popover (pins.js) ---------- */
+.tcw-pins-pop {
+  position: fixed; z-index: 2147483645; display: flex; flex-direction: column; overflow: hidden;
+  background: #18181b; color: #efeff1; border: 1px solid #3a3a3d; border-radius: 10px; box-shadow: 0 10px 34px rgba(0, 0, 0, .55);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: left; animation: tcw-in .12s ease-out;
+}
+.tcw-pins-pop, .tcw-pins-pop * { box-sizing: border-box; letter-spacing: normal; text-transform: none; }
+.tcw-pin-title { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid #2f2f35; }
+.tcw-pin-list { overflow-y: auto; padding: 4px 0; }
+.tcw-pin-row { padding: 6px 10px; border-bottom: 1px solid #26262c; }
+.tcw-pin-row:last-child { border-bottom: none; }
+.tcw-pin-head { display: flex; align-items: baseline; gap: 6px; }
+.tcw-pin-head small { flex: 1; color: #adadb8; font-size: 11px; }
+.tcw-pin-head .tcw-btn { padding: 1px 6px; }
+.tcw-pin-text { margin-top: 2px; word-break: break-word; }
+.tcw-pin-empty { padding: 14px 12px; color: #adadb8; }
+.tcw-pin-foot { padding: 6px 10px; border-top: 1px solid #2f2f35; color: #adadb8; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .tcw-pins-pop { animation: none; } }

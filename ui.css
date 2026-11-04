@@ -465,3 +465,6 @@ body.full .set-nav { flex-wrap: wrap; overflow: visible; }
 .pin-tag { white-space: nowrap; }
 [data-panel="pins"] .list-tools .seg { flex: 0 1 auto; }
 [data-panel="pins"] .text { white-space: pre-wrap; }
+.pin-status { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.pin-status.live { color: var(--ok); }
+[data-panel="pins"] .seg button { white-space: nowrap; flex: none; padding: 6px 11px; }

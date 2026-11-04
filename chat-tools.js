@@ -238,7 +238,8 @@
     if (kwRecent.size > 200) for (const [k, t] of kwRecent) if (now - t > 10000) kwRecent.delete(k);
     const name = d.author.display || d.login;
     browser.runtime.sendMessage({
-      type: "keyword", term, login: d.login, display: name, channel: C.currentChannel(), text: d.text, msgId: line.dataset.tcwId || null
+      type: "keyword", term, login: d.login, display: name, channel: C.currentChannel(), text: d.text, msgId: line.dataset.tcwId || null,
+      ...C.speechInfo(line, d.text)
     }).then((r) => {
       if (r && r.localSound) C.playLocal(r.localSound.type, r.localSound.volume);
     }).catch(() => {});
