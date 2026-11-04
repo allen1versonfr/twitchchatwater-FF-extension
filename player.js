@@ -1,5 +1,6 @@
-/* Player tools: stream delay next to the watch time, an audio compressor (with presets, makeup gain and a
- * safety limiter), volume boost, mono, scroll-wheel volume, middle-click mute and per-channel volume memory.
+/* Player tools: stream delay next to the watch time, stable volume (automatic leveling), an audio compressor (with
+ * presets, makeup gain and a safety limiter), volume boost, mono, scroll-wheel volume, middle-click mute and
+ * per-channel volume memory.
  *
  * Volume goes through Twitch's own player when we can reach it (so its slider stays in sync), otherwise the
  * <video> element. Audio processing uses Web Audio; a video is only routed through it once you actually turn
@@ -213,12 +214,16 @@
   // ---------- audio processing ----------
 
   let ctx = null;
-  const graphs = new WeakMap(); // video -> { src, comp, makeup, boost, mono, limiter }
+  const graphs = new WeakMap(); // video -> { src, mono, level, comp, makeup, boost, limiter, hp, meter, sink }
   let gestured = false;
 
   function wantProcessing() {
     const s = S();
-    return s.audioComp !== "off" || Number(s.audioBoost) > 100 || s.audioMono;
+    return s.audioComp !== "off" || Number(s.audioBoost) > 100 || s.audioMono || levelOn();
+  }
+
+  function levelOn() {
+    return !!TCWChatLib.LEVEL_PRESETS[S().audioLevel];
   }
 
   function graphFor(vid) {
@@ -233,6 +238,14 @@
       return null; // already routed by an earlier copy of the add-on; Twitch gives the next stream a fresh video
     }
     const mono = ctx.createGain();
+    const level = ctx.createGain(); // stable volume: turned up and down by the leveler below
+    const hp = ctx.createBiquadFilter(); // its ears: bass counts less, like loudness meters do
+    hp.type = "highpass";
+    hp.frequency.value = 120;
+    const meter = ctx.createAnalyser();
+    meter.fftSize = 2048;
+    const sink = ctx.createGain(); // keeps the meter running without adding sound
+    sink.gain.value = 0;
     const comp = ctx.createDynamicsCompressor();
     const makeup = ctx.createGain();
     const boost = ctx.createGain();
@@ -242,7 +255,7 @@
     limiter.ratio.value = 20;
     limiter.attack.value = 0.001;
     limiter.release.value = 0.1;
-    g = { src, mono, comp, makeup, boost, limiter };
+    g = { src, mono, level, comp, makeup, boost, limiter, hp, meter, sink, lvl: null };
     graphs.set(vid, g);
     wire(g);
     return g;
@@ -251,7 +264,7 @@
   // Connects only the stages that are in use, so "off" really is the untouched sound.
   function wire(g) {
     const s = S();
-    const nodes = Object.values(g);
+    const nodes = Object.values(g).filter((n) => n && typeof n.disconnect === "function");
     for (const n of nodes) try { n.disconnect(); } catch (e) { /* not connected */ }
     const chain = [g.src];
     if (s.audioMono) {
@@ -259,6 +272,19 @@
       g.mono.channelCountMode = "explicit";
       g.mono.channelInterpretation = "speakers";
       chain.push(g.mono);
+    }
+    const leveling = levelOn();
+    if (leveling) {
+      const tap = chain[chain.length - 1];
+      tap.connect(g.hp);
+      g.hp.connect(g.meter);
+      g.meter.connect(g.sink);
+      g.sink.connect(ctx.destination);
+      if (!g.lvl) g.level.gain.value = 1;
+      chain.push(g.level);
+    } else {
+      g.lvl = null;
+      g.level.gain.value = 1;
     }
     const p = PRESETS[s.audioComp];
     if (p) {
@@ -276,7 +302,7 @@
       g.boost.gain.value = boost;
       chain.push(g.boost);
     }
-    if (p || boost > 1) chain.push(g.limiter); // keep loud parts from clipping
+    if (p || boost > 1 || leveling) chain.push(g.limiter); // keep loud parts from clipping
     chain.push(ctx.destination);
     for (let i = 0; i < chain.length - 1; i++) chain[i].connect(chain[i + 1]);
   }
@@ -295,6 +321,33 @@
       C.debug("audio processing unavailable", e);
     }
   }
+
+  // ---------- stable volume ----------
+  // Measures how loud the stream is (before your own volume) and turns the level stage up or down to keep it even.
+
+  let levelBuf = null;
+  let levelAt = 0;
+
+  function levelTick() {
+    if (!levelOn() || !ctx) return;
+    const vid = mainVideo();
+    const g = vid && graphs.get(vid);
+    if (!g) return;
+    const now = performance.now();
+    const dt = levelAt ? Math.min(0.5, (now - levelAt) / 1000) : 0.05;
+    levelAt = now;
+    if (vid.paused || vid.muted || vid.volume <= 0) return; // nothing to measure; keep the current level
+    if (!levelBuf || levelBuf.length !== g.meter.fftSize) levelBuf = new Float32Array(g.meter.fftSize);
+    g.meter.getFloatTimeDomainData(levelBuf);
+    let sum = 0;
+    for (let i = 0; i < levelBuf.length; i++) sum += levelBuf[i] * levelBuf[i];
+    const rms = Math.sqrt(sum / levelBuf.length);
+    // the element's own volume is applied before us; take it back out so your slider still means what it says
+    const inDb = rms > 0 ? 20 * Math.log10(rms) - 20 * Math.log10(vid.volume) : -100;
+    g.lvl = TCWChatLib.levelerStep(g.lvl, inDb, dt, S().audioLevel);
+    g.level.gain.setTargetAtTime(Math.pow(10, g.lvl.gain / 20), ctx.currentTime, 0.04);
+  }
+  setInterval(levelTick, 50);
 
   function onGesture() {
     gestured = true;
@@ -508,14 +561,23 @@
     const boostOut = el("output", {}, s.audioBoost + "%");
     boost.addEventListener("input", () => { boostOut.textContent = boost.value + "%"; });
     boost.addEventListener("change", () => save({ audioBoost: Number(boost.value) }));
+    const level = el("select", { "aria-label": "Stable volume" },
+      [["off", "Off"], ["gentle", "Gentle"], ["normal", "Normal"], ["strong", "Strong"]]
+        .map(([v, t]) => el("option", { value: v }, t)));
+    level.value = s.audioLevel in TCWChatLib.LEVEL_PRESETS ? s.audioLevel : "off";
+    level.addEventListener("change", () => save({ audioLevel: level.value }));
     const mono = el("input", { type: "checkbox", checked: s.audioMono ? "" : null, "aria-label": "Mono" });
     mono.checked = !!s.audioMono;
     mono.addEventListener("change", () => save({ audioMono: mono.checked }));
     const meter = el("div", { class: "tcw-audio-meter" }, el("span"));
+    const levelOut = el("output", { class: "tcw-audio-level" }, "");
     const active = !!graphs.get(mainVideo());
     panel.meter = meter;
+    panel.levelOut = levelOut;
     panel.box.replaceChildren(
       el("div", { class: "tcw-audio-head" }, el("b", {}, "Audio"), el("button", { class: "tcw-btn tcw-icon", "aria-label": "Close", onclick: closePanel }, "✕")),
+      el("label", { class: "tcw-audio-row", title: "Evens out loud and quiet parts so you don't have to keep changing the volume" },
+        el("span", {}, "Stable volume"), level, levelOut),
       el("label", { class: "tcw-audio-row" }, el("span", {}, "Compressor"), comp),
       el("label", { class: "tcw-audio-row" }, el("span", {}, "Boost"), boost, boostOut),
       el("label", { class: "tcw-audio-row" }, el("span", {}, "Mono"), mono),
@@ -535,6 +597,11 @@
     const red = g && PRESETS[S().audioComp] ? Math.max(0, -g.comp.reduction) : 0;
     panel.meter.firstChild.style.width = Math.min(100, red * 4) + "%";
     panel.meter.title = red ? `${red.toFixed(1)} dB of compression right now` : "No compression right now";
+    if (panel.levelOut) {
+      const lv = g && g.lvl && levelOn() ? g.lvl.gain : null;
+      panel.levelOut.textContent = lv == null ? "" : (lv >= 0 ? "+" : "−") + Math.abs(lv).toFixed(1) + " dB";
+      panel.levelOut.title = lv == null ? "" : "How much stable volume is turning the stream up (+) or down (−) right now";
+    }
   }
 
   document.addEventListener("mousedown", (e) => {
@@ -546,7 +613,7 @@
   C.attach({
     settings: (s, keys) => {
       if (!keys) return;
-      if (["audioComp", "audioBoost", "audioMono"].some((k) => keys.has(k))) {
+      if (["audioComp", "audioBoost", "audioMono", "audioLevel"].some((k) => keys.has(k))) {
         applyAudio();
         if (panel) renderPanel();
       }
@@ -570,5 +637,11 @@
   }, 2000);
   setInterval(updateMeter, 200);
 
-  C.player = { delayInfo, getVolume, setVolume, refreshPlayer, PRESETS };
+  // how many dB stable volume is adding (+) or taking away (−) right now; null when it isn't running
+  function levelGain() {
+    const g = graphs.get(mainVideo());
+    return g && g.lvl && levelOn() ? g.lvl.gain : null;
+  }
+
+  C.player = { delayInfo, getVolume, setVolume, refreshPlayer, levelGain, PRESETS };
 })();

@@ -443,6 +443,94 @@
     return out;
   }
 
+  // ---------- stable volume (auto-leveling) ----------
+  // Keeps the stream near one loudness so quiet talk and loud moments don't need the volume slider.
+  // Loud jumps are pulled down within a fraction of a second; quiet parts are raised slowly and only after a
+  // short hold, so a single loud moment doesn't make the next quiet line blast out. Silence is never boosted.
+
+  const LEVEL_PRESETS = {
+    //        max boost, max cut (dB), raise dB/s, lower dB/s
+    gentle: { up: 6, down: 9, upRate: 1.5, downRate: 20 },
+    normal: { up: 12, down: 15, upRate: 3, downRate: 40 },
+    strong: { up: 18, down: 20, upRate: 5, downRate: 60 }
+  };
+  const LEVEL_TARGET = -20; // dBFS RMS of the (high-passed) sound before your own volume
+  const LEVEL_GATE = -52;   // quieter than this is treated as silence
+
+  // One step: `inDb` is the loudness measured over the last `dt` seconds. Returns the new { gain, loud, hold }.
+  function levelerStep(st, inDb, dt, preset) {
+    const p = LEVEL_PRESETS[preset] || LEVEL_PRESETS.normal;
+    st = st || { gain: 0, loud: LEVEL_TARGET, hold: 0 };
+    const x = Number.isFinite(inDb) ? Math.max(-100, inDb) : -100;
+    // follow loudness up fast and down slowly, so speech pauses don't count as "quiet"
+    const tau = x > st.loud ? 0.15 : 0.9;
+    const loud = st.loud + (x - st.loud) * (1 - Math.exp(-dt / tau));
+    let { gain, hold } = st;
+    if (loud >= LEVEL_GATE) {
+      const want = Math.max(-p.down, Math.min(p.up, LEVEL_TARGET - loud));
+      if (want < gain) {
+        gain = Math.max(want, gain - p.downRate * dt);
+        hold = 1.5;
+      } else if (hold > 0) {
+        hold = Math.max(0, hold - dt);
+      } else {
+        gain = Math.min(want, gain + p.upRate * dt);
+      }
+    }
+    return { gain, loud, hold };
+  }
+
+  // ---------- reading messages aloud ----------
+
+  // What text-to-speech says for a chat message: links shortened, emote spam collapsed, kept short.
+  function ttsText(display, channel, text, max = 200) {
+    let t = String(text || "")
+      .replace(/[\u200B-\u200D\uFEFF\u{E0000}]/gu, "")
+      .replace(/https?:\/\/\S+|www\.\S+/gi, "link")
+      .replace(/\s+/g, " ")
+      .trim();
+    // "KEKW KEKW KEKW KEKW" -> "KEKW"
+    const words = t.split(" ");
+    t = words.filter((w, i) => i === 0 || w !== words[i - 1]).join(" ");
+    if (t.length > max) t = t.slice(0, max).replace(/\s+\S*$/, "") + "…";
+    const who = String(display || "Someone").trim();
+    return `${who}${channel ? " in " + channel : ""}: ${t || "sent a message"}`;
+  }
+
+  // ---------- pinned messages ----------
+  // pins: [{ id, ch, login, display, text, time, by: "you"|"twitch", pinnedAt, tabId?, frameId?, msgId? }] newest first
+
+  function pinKey(p) {
+    return [p.ch || "", (p.login || "").toLowerCase(), String(p.text || "").replace(/\s+/g, " ").trim()].join("|");
+  }
+
+  // Adds a pin (or moves an existing identical one to the top). Returns { pins, added }.
+  function addPin(pins, p, cap = 500) {
+    pins = Array.isArray(pins) ? pins : [];
+    const text = String(p.text || "").replace(/\s+/g, " ").trim().slice(0, 500);
+    if (!text) return { pins, added: false };
+    const entry = {
+      id: p.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+      ch: String(p.ch || "").toLowerCase().slice(0, 25),
+      login: String(p.login || "").toLowerCase().slice(0, 25),
+      display: String(p.display || p.login || "").slice(0, 40),
+      text,
+      time: Number(p.time) || Date.now(),
+      pinnedAt: Number(p.pinnedAt) || Date.now(),
+      by: p.by === "twitch" ? "twitch" : "you"
+    };
+    if (p.pinner) entry.pinner = String(p.pinner).slice(0, 40);
+    for (const k of ["tabId", "frameId"]) if (Number.isInteger(p[k])) entry[k] = p[k];
+    if (p.msgId) entry.msgId = String(p.msgId).slice(0, 80);
+    const key = pinKey(entry);
+    const old = pins.find((x) => pinKey(x) === key);
+    // seen again (Twitch keeps a pin on screen for a while): keep the first time and who pinned it
+    if (old && old.by === "twitch" && entry.by === "twitch") return { pins, added: false };
+    const rest = pins.filter((x) => pinKey(x) !== key);
+    if (old) { entry.id = old.id; if (old.by === "you") entry.by = "you"; }
+    return { pins: [entry, ...rest].slice(0, cap), added: !old };
+  }
+
   // ---------- VOD unmute ----------
   // Twitch mutes parts of a VOD by pointing its playlist at "123-muted.ts" (or "123-muted.mp4" and an
   // "init-0-muted.mp4" map for newer VODs) instead of the original file, which often stays on the CDN for a while.
@@ -489,7 +577,7 @@
     parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
     bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
     splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration,
-    unmutePlaylist, learnRecord, rankEmotes
+    unmutePlaylist, learnRecord, rankEmotes, LEVEL_PRESETS, LEVEL_TARGET, levelerStep, ttsText, pinKey, addPin
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

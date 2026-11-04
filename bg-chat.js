@@ -359,6 +359,7 @@ async function onKeyword(msg, sender) {
     }
     if (settings.hlNotify) notify(`${display}${channel ? " in #" + channel : ""} · “${term}”`, text || " ", target);
   }
+  speak(settings, display, channel, text);
   return result;
 }
 

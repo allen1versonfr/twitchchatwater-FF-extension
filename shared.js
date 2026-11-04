@@ -30,6 +30,7 @@ var TCW = (() => {
     watchBadge: true,          // show it next to the live viewer count
     watchVisibleOnly: false,   // only count while the Twitch tab is visible
     delayBadge: true,          // stream delay next to the viewer count (click to catch up)
+    audioLevel: "off",         // off | gentle | normal | strong  (stable volume: evens out loud and quiet parts)
     audioComp: "off",          // off | light | medium | strong  (audio compressor)
     audioBoost: 100,           // % volume, up to 400
     audioMono: false,
@@ -61,6 +62,13 @@ var TCW = (() => {
     hlSound: "ping",           // sound for highlighted words; "none" = silent
     hlFlash: true,             // flash the tab title for highlighted words
     hlNotify: false,
+    ttsOn: false,              // read highlighted messages aloud
+    ttsWhen: "unfocused",      // unfocused (only while Firefox isn't the active app) | always
+    ttsWatch: false,           // ... and messages from people on your watchlist
+    ttsMentions: false,        // ... and @mentions / replies to you
+    ttsVoice: "",              // voice name; blank = the system default
+    ttsRate: 1.1,
+    ttsVolume: 0.9,
     hlBadgeBroadcaster: false, // highlight messages by badge
     hlBadgeMod: false,
     hlBadgeVip: false,
@@ -89,6 +97,7 @@ var TCW = (() => {
     autoMoments: true,         // claim Moments
     autoDrops: true,           // claim Drops (in chat and on the inventory page)
     autoDropsBg: false,        // check the Drops inventory every 30 minutes in a background tab
+    pinsAuto: true,            // keep a copy of messages pinned in Twitch chat (Pins tab)
     paintServer: "",           // override of TCW_CONFIG.paintServer
     twitchClientId: "",        // override of TCW_CONFIG.twitchClientId
     debug: false

@@ -72,6 +72,7 @@
   let hits = 0;
   let lastAuthor = "";
   let contextUser = null;
+  let contextMsg = null; // the chat message you right-clicked, for "Pin this message"
   let audio = null;
 
   const PAGE_ID = Math.random().toString(36).slice(2, 8); // keeps message ids unique across reloads
@@ -1028,6 +1029,7 @@
     "contextmenu",
     (e) => {
       contextUser = null;
+      contextMsg = null;
       const t = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
       if (!t) return;
       const mention = t.closest(".mention-fragment, [data-a-target='chat-message-mention']");
@@ -1040,6 +1042,10 @@
       if (line) {
         const a = getAuthor(line);
         contextUser = a.display || a.names[0] || null;
+        contextMsg = {
+          ch: currentChannel(), login: a.names[0] || "", display: a.display || a.names[0] || "",
+          text: getText(line, a.display), msgId: line.dataset.tcwId || null, time: Date.now()
+        };
         return;
       }
       const nameEl = t.closest(NAME_SEL + ",[data-a-user]");
@@ -1051,6 +1057,7 @@
   browser.runtime.onMessage.addListener((msg) => {
     if (!msg) return;
     if (msg.type === "getContextUser") return Promise.resolve(contextUser);
+    if (msg.type === "getContextMessage") return Promise.resolve(contextMsg);
     if (msg.type === "tcw:ping") return Promise.resolve(true);
     if (msg.type === "toast") toast(msg.text);
     if (msg.type === "jump") return Promise.resolve(jumpLocal(msg.msgId));

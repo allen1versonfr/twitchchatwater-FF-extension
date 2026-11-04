@@ -273,3 +273,51 @@ test("learnRecord keeps its storage bounded", () => {
   assert.equal(Object.keys(learn.picks.k).length, 8);
   assert.equal(L.learnRecord(null, {}).ch && true, true);
 });
+
+test("levelerStep pulls loud parts down fast, raises quiet parts slowly, and ignores silence", () => {
+  const run = (st, db, secs, preset = "normal") => {
+    for (let t = 0; t < secs; t += 0.05) st = L.levelerStep(st, db, 0.05, preset);
+    return st;
+  };
+  let st = run(null, -20, 3);
+  assert.ok(Math.abs(st.gain) < 0.5, "on-target audio stays untouched");
+
+  st = run(st, -6, 0.5); // something 14 dB too loud
+  assert.ok(st.gain < -10, `loud part cut quickly (${st.gain.toFixed(1)} dB)`);
+
+  const afterLoud = run(st, -32, 1); // quiet again: held for a moment
+  assert.ok(afterLoud.gain < st.gain + 2.5, "no instant jump back up");
+  const later = run(afterLoud, -32, 10);
+  assert.ok(Math.abs(later.gain - 12) < 0.5, `quiet part raised to target (${later.gain.toFixed(1)} dB)`);
+
+  const silent = run(later, -90, 10);
+  assert.ok(Math.abs(silent.gain - later.gain) < 0.01, "silence doesn't change the gain");
+
+  const gentle = run(null, -40, 20, "gentle");
+  assert.ok(gentle.gain <= 6 + 1e-9, "gentle never boosts more than 6 dB");
+});
+
+test("ttsText makes chat readable aloud", () => {
+  assert.equal(L.ttsText("Bob", "chan", "check https://x.y/z KEKW KEKW KEKW nice"), "Bob in chan: check link KEKW nice");
+  assert.equal(L.ttsText("Bob", "", "  "), "Bob: sent a message");
+  const long = L.ttsText("A", "", Array.from({ length: 100 }, (_, i) => "w" + i).join(" "), 30);
+  assert.ok(long.endsWith("…") && long.length < 45);
+});
+
+test("addPin keeps one copy per message, newest first, and remembers you pinned it", () => {
+  let r = L.addPin([], { ch: "Chan", login: "Bob", display: "Bob", text: "hello  world", by: "twitch" });
+  assert.equal(r.added, true);
+  assert.equal(r.pins[0].ch, "chan");
+  assert.equal(r.pins[0].text, "hello world");
+  // Twitch shows the same pin again -> nothing new
+  const again = L.addPin(r.pins, { ch: "chan", login: "bob", text: "hello world", by: "twitch" });
+  assert.equal(again.added, false);
+  assert.equal(again.pins.length, 1);
+  // you pin it too -> moves to the top as yours, same id
+  r = L.addPin(L.addPin(r.pins, { ch: "x", login: "amy", text: "other", by: "you" }).pins, { ch: "chan", login: "bob", text: "hello world", by: "you" });
+  assert.equal(r.pins.length, 2);
+  assert.equal(r.pins[0].by, "you");
+  assert.equal(r.pins[0].id, again.pins[0].id);
+  assert.equal(L.addPin(r.pins, { text: "   " }).added, false);
+  assert.equal(L.addPin(Array.from({ length: 5 }, (_, i) => ({ ch: "c", login: "u", text: "t" + i })), { text: "new" }, 5).pins.length, 5);
+});

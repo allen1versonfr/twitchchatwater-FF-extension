@@ -25,6 +25,11 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 - **Firefox Sync**: your watchlist and settings follow you to other computers signed in to Firefox (with **Add-ons** sync turned on).
   Message counts and activity history stay on each computer.
 - **Activity log** of everything your watchlist said, newest first.
+- **Pins tab**: a history of pinned chat messages. Messages pinned in Twitch chat are saved automatically (and stay after
+  they're unpinned); right-click any message and pick **Pin this message** to pin one yourself. Search, filter by channel or
+  by who pinned it, copy, jump back to the message. Stored only on this computer.
+- **Read aloud**: text-to-speech for your highlighted messages (optionally also watchlist messages and @mentions), by
+  default only while Firefox isn't the app you're using. Pick the voice, speed and volume in Settings → Read aloud.
 - **Status tab** showing whether each open Twitch tab's chat is being read, plus a test button.
 - Right-click any chat message, then pick **Watch this chat user**.
 - Backup and restore your watchlist as a file.
@@ -34,7 +39,7 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
   See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
   See [Nametag paints](#nametag-paints).
-- **Player**: stream delay, refresh button, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel, VOD unmute.
+- **Player**: stable volume, stream delay, refresh button, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel, VOD unmute.
   See [Player and audio](#player-and-audio).
 - **Chat tools, moderation and auto-claim**: 7TV emotes, an emote menu, highlights, filters, deleted-message recovery and more.
   See [Chat tools](#chat-tools). They're all in the **Chat** tab.
@@ -43,7 +48,12 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 
 ## Player and audio
 
-In **Chat → Player & audio**, and from the 🎚 button in the player controls:
+In **Settings → Player & audio**, and from the 🎚 button in the player controls:
+
+- **Stable volume**: evens out loud and quiet moments so you don't have to keep adjusting the volume. Loud parts are
+  turned down within a fraction of a second, quiet parts are raised gently after a short pause (so one loud moment doesn't
+  make the next quiet line blast out), and silence is never boosted. Your own volume slider still works as usual.
+  Gentle (±6 dB), Normal (±12 dB) or Strong (±18 dB); the 🎚 menu shows how much it's adjusting right now.
 - **Stream delay** (⏳) in the player's control bar and next to the viewer count and your watch time: how far behind the
   streamer you are, from Twitch's own player (or its Video Stats, or the buffer size if neither says). Green under 4 s, yellow under 8 s, red above. Click it to jump closer to live.
 - **Audio compressor**, a reworked version of 7TV's: three presets (light, medium like 7TV, strong "night mode") with matching
@@ -185,7 +195,8 @@ The add-on reads chat on twitch.tv pages and keeps everything in your browser. T
 - **7TV, BTTV and FFZ emotes** (Chat tab, each on by default and each can be turned off): the channel's Twitch user ID is looked up from Twitch and sent to 7TV (`7tv.io`), BetterTTV (`api.betterttv.net`) and FrankerFaceZ (`api.frankerfacez.com`) to get its emote lists. Emote images load from their servers.
 - **Live emote updates and personal emotes** (on by default): the add-on keeps a connection to 7TV's event service (`events.7tv.io`) and BetterTTV's (`sockets.betterttv.net`) for the channels you have open, telling them only which channel it's watching. Nothing about you is sent.
 
-Chat messages, your activity history, your watch time, your emote usage and the moderation log are never sent anywhere.
+Chat messages, your activity history, your pinned messages, your watch time, your emote usage and the moderation log are never sent anywhere.
+Read aloud uses the voices installed on your computer through Firefox.
 
 ## If nothing happens
 
