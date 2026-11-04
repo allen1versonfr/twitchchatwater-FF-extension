@@ -607,6 +607,21 @@
     return { text: out.join("\n"), swaps };
   }
 
+  // After a refresh: a provider whose lookup failed keeps the emotes it had (and its 7TV set/user ids for live
+  // updates) instead of coming back empty, which would turn every one of its emotes back into plain text.
+  function keepWorking(prev, fresh) {
+    const failed = (fresh && fresh.failed) || {};
+    if (!prev) return fresh;
+    if (failed.room) return { ...prev, failed, have: { ...prev.have } };
+    const out = { ...fresh };
+    for (const k of ["seven", "bttv", "ffz"]) {
+      if (!failed[k] || !prev.have || !prev.have[k]) continue;
+      out[k] = prev[k];
+      if (k === "seven") { out.sevenSet = out.sevenSet || prev.sevenSet; out.sevenUser = out.sevenUser || prev.sevenUser; }
+    }
+    return out;
+  }
+
   function fmtDuration(sec) {
     sec = Math.max(0, Math.round(Number(sec) || 0));
     if (sec < 60) return sec + "s";
@@ -619,7 +634,7 @@
     parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
     bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
     splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration,
-    unmutePlaylist, learnRecord, rankEmotes, LEVEL_PRESETS, LEVEL_TARGET, levelerStep, ttsText, pinKey, addPin, endPin
+    unmutePlaylist, learnRecord, rankEmotes, LEVEL_PRESETS, LEVEL_TARGET, levelerStep, keepWorking, ttsText, pinKey, addPin, endPin
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;

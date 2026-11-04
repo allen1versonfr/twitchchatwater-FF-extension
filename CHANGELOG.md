@@ -2,6 +2,12 @@
 
 ## 3.10.0
 
+- **Fixed 7TV emotes that stopped working.** Emote lists are refreshed every 10 minutes; if 7TV (or Twitch's channel
+  lookup) didn't answer during a refresh, the channel's 7TV emotes were replaced by an empty list and every emote turned
+  back into plain text, and the open page never picked them up again. Now a failed refresh keeps the emotes you had and
+  tries again a minute later; a failed first load is retried after 10 seconds; global and personal emote lookups that
+  fail are retried instead of being remembered as "no emotes"; and each open chat checks once a minute that its emotes
+  match and repairs itself if it missed an update.
 - **A roomier, easier-to-navigate menu.**
   - Settings now opens on a list of categories (Alerts & read aloud, Chat, Emotes, Highlights & filters, Player & audio,
     Moderation, Auto-claim, Nametag paints, Watch time, Sync & data), each with an icon and a summary of what's inside.

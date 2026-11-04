@@ -355,3 +355,21 @@ test("pins: Hype Chats from IRC, merging by Twitch's pin id, and ended pins", ()
   // pinned again later: "ended" is cleared
   assert.equal(L.addPin(ended.pins, { ch: "chan", login: "viewer", text: "drop at 9", by: "twitch", pinId: "p1" }).pins[0].endedAt, undefined);
 });
+
+test("keepWorking keeps a provider's emotes when its refresh fails", () => {
+  const prev = { room: "1", seven: [{ n: "KEKW" }], sevenSet: "s1", sevenUser: "u1", bttv: [{ n: "catJAM" }], ffz: [], have: { seven: true, bttv: true, ffz: true }, t: 1 };
+  // 7TV failed, BTTV worked
+  const fresh = { room: "1", seven: [], sevenSet: "", sevenUser: "", bttv: [{ n: "pepeD" }], ffz: [], have: { seven: true, bttv: true, ffz: true }, failed: { seven: true }, t: 2 };
+  const r = L.keepWorking(prev, fresh);
+  assert.deepEqual(r.seven, [{ n: "KEKW" }]);
+  assert.equal(r.sevenSet, "s1");
+  assert.deepEqual(r.bttv, [{ n: "pepeD" }]);
+  // the channel lookup itself failed: keep everything
+  const all = L.keepWorking(prev, { room: "", seven: [], bttv: [], ffz: [], have: prev.have, failed: { room: true, seven: true, bttv: true, ffz: true } });
+  assert.deepEqual(all.seven, prev.seven);
+  assert.deepEqual(all.bttv, prev.bttv);
+  // first load: nothing to keep
+  assert.equal(L.keepWorking(null, fresh), fresh);
+  // a real change (no failure) still goes through
+  assert.deepEqual(L.keepWorking(prev, { ...fresh, seven: [{ n: "OMEGALUL" }], failed: {} }).seven, [{ n: "OMEGALUL" }]);
+});
