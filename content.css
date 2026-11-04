@@ -382,6 +382,7 @@ html.tw-root--theme-light .tcw-watch.tcw-delay { background: rgba(0, 173, 3, .16
 .tcw-audio-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .tcw-audio-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
 .tcw-audio-row > span { width: 86px; flex: none; color: #adadb8; }
+.tcw-audio-level { min-width: 52px; text-align: right; color: #adadb8; font-size: 11px; font-variant-numeric: tabular-nums; }
 .tcw-audio-row select { flex: 1; min-width: 0; background: #0e0e10; color: #efeff1; border: 1px solid #3a3a3d; border-radius: 6px; padding: 3px 6px; font: inherit; }
 .tcw-audio-row input[type=range] { flex: 1; min-width: 0; accent-color: #9147ff; }
 .tcw-audio-row input[type=checkbox] { accent-color: #9147ff; width: 16px; height: 16px; margin: 0; }

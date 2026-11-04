@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.8.0
+
+- **Stable volume** (Settings → Player & audio, or the player's 🎚 menu): evens out loud and quiet moments so you don't
+  have to keep adjusting the volume. Loud jumps are pulled down within a fraction of a second (a limiter catches the first
+  instant), quiet parts are raised gently after a short hold, silence is never boosted, and your own volume slider keeps
+  working. Gentle / Normal / Strong; the 🎚 menu shows the adjustment live. Off by default.
+- **Read aloud** (Settings → Read aloud): text-to-speech for highlighted messages, by default only while Firefox isn't
+  in focus. Optionally also watchlist messages and @mentions/replies. Choose the voice, speed and volume, and test it.
+  Links are read as "link" and emote spam is collapsed; if messages pile up it skips to the newest.
+- **Pins tab**: a history of pinned chat messages. Messages pinned in Twitch chat are saved automatically, and you can
+  pin any message yourself (right-click → Pin this message). Search, filter by channel or by who pinned it, copy, jump
+  back to the message, remove, clear. Stored only on this computer.
+
 ## 3.7.0
 
 - **Emote suggestions learn from you.** `;`, as-you-type, Tab completion and emote-menu search now rank by:

@@ -319,7 +319,8 @@ function updateOutputs() {
   for (const out of $$("output[data-for]")) {
     const input = $(`[data-setting='${out.dataset.for}']`);
     const v = Number(input.value);
-    out.textContent = out.dataset.for === "volume" ? Math.round(v * 100) + "%" : v + "%";
+    const k = out.dataset.for;
+    out.textContent = k === "volume" || k === "ttsVolume" ? Math.round(v * 100) + "%" : k === "ttsRate" ? v.toFixed(1) + "×" : v + "%";
   }
 }
 
@@ -337,7 +338,39 @@ function readSetting(el) {
   return el.value;
 }
 
+// ---------- read aloud ----------
+
+function fillVoices() {
+  const sel = $("#ttsVoice");
+  if (!sel || !window.speechSynthesis) return;
+  const voices = speechSynthesis.getVoices();
+  const want = state.settings.ttsVoice || "";
+  sel.replaceChildren(h("option", { value: "" }, "System default"),
+    ...voices.map((v) => h("option", { value: v.name }, `${v.name} (${v.lang})`)));
+  if (want && !voices.some((v) => v.name === want)) sel.append(h("option", { value: want }, want + " (not on this computer)"));
+  sel.value = want;
+}
+
+function testVoice() {
+  if (!window.speechSynthesis) return;
+  const s = state.settings;
+  const u = new SpeechSynthesisUtterance(TCWChatLib.ttsText("Chat Watcher", "", "This is how highlighted messages will sound."));
+  const v = speechSynthesis.getVoices().find((x) => x.name === s.ttsVoice);
+  if (v) u.voice = v;
+  u.rate = Number(s.ttsRate) || 1;
+  u.volume = Number(s.ttsVolume) || 1;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
 function bindSettings() {
+  if (window.speechSynthesis) {
+    fillVoices();
+    speechSynthesis.addEventListener("voiceschanged", fillVoices);
+    $("#ttsTest").addEventListener("click", testVoice);
+  } else {
+    $("#ttsTest").disabled = true;
+  }
   $("#soundType").replaceChildren(...soundOptions(false));
   $("#mentionSound").replaceChildren(...soundOptions(false), h("option", { value: "none" }, "Silent"));
   $("#previewMention").addEventListener("click", () => playLocal(state.settings.mentionSound, state.settings.volume));

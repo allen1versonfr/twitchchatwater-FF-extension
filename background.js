@@ -277,6 +277,28 @@ async function playHere(type, volume) {
   }
 }
 
+// ---------- read aloud ----------
+// Highlighted messages (and optionally watchlist messages and mentions) are spoken with the computer's voices.
+// "Only when Firefox isn't in focus" uses Firefox's own focus events: no window focused = you're in another app.
+
+let firefoxFocused = true;
+browser.windows.getLastFocused().then((w) => { firefoxFocused = !!(w && w.focused); }).catch(() => {});
+browser.windows.onFocusChanged.addListener((id) => { firefoxFocused = id !== browser.windows.WINDOW_ID_NONE; });
+
+function speak(settings, display, channel, text) {
+  if (!settings.ttsOn || !window.speechSynthesis) return;
+  if (settings.ttsWhen !== "always" && firefoxFocused) return;
+  const synth = window.speechSynthesis;
+  // a busy chat shouldn't build a backlog: if one is already waiting, skip to the newest
+  if (synth.pending) synth.cancel();
+  const u = new SpeechSynthesisUtterance(TCWChatLib.ttsText(display, channel, text));
+  const voice = settings.ttsVoice && synth.getVoices().find((v) => v.name === settings.ttsVoice);
+  if (voice) u.voice = voice;
+  u.rate = Math.max(0.5, Math.min(2, Number(settings.ttsRate) || 1));
+  u.volume = Math.max(0, Math.min(1, Number(settings.ttsVolume) || 1));
+  synth.speak(u);
+}
+
 function notify(title, message, target) {
   const id = "tcw-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
   if (target) notifTargets.set(id, target);
@@ -332,6 +354,7 @@ async function onHit(msg, sender) {
   if (settings.notifications && user.notify) {
     notify(channel ? `${display} in #${channel}` : display, text || "sent a message", target);
   }
+  if (settings.ttsWatch) speak(settings, display, channel, text);
   return result;
 }
 
@@ -373,6 +396,7 @@ async function onMention(msg, sender) {
       notify(kind === "reply" ? `${display} replied to you${where}` : `${display} mentioned you${where}`, text || " ", target);
     }
   }
+  if (settings.ttsMentions) speak(settings, display, channel, text);
   return result;
 }
 
@@ -772,6 +796,16 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return serial(() => setSettings(msg.patch));
     case "clearLog":
       return serial(() => browser.storage.local.set({ log: [] }));
+    case "pins:add":
+      return serial(() => addPinned(msg.pin, sender, "twitch"));
+    case "pins:remove":
+      return serial(async () => {
+        const d = await browser.storage.local.get("pins");
+        const pins = (Array.isArray(d.pins) ? d.pins : []).filter((p) => p.id !== msg.id);
+        await browser.storage.local.set({ pins });
+      });
+    case "pins:clear":
+      return serial(() => browser.storage.local.set({ pins: [] }));
     case "resetStats":
       return serial(async () => {
         const { users } = await load();
@@ -923,6 +957,50 @@ browser.menus.create(
   },
   () => void browser.runtime.lastError
 );
+
+// ---------- pinned messages ----------
+// The Pins tab: messages pinned in Twitch chat (seen automatically, if "pinsAuto" is on) and ones you pin yourself
+// (right-click a message → Pin this message). Stored only on this computer.
+
+async function addPinned(pin, sender, by) {
+  if (!pin || typeof pin !== "object") return { added: false };
+  if (by === "twitch") {
+    const { settings } = await load();
+    if (!settings.pinsAuto) return { added: false };
+  }
+  const d = await browser.storage.local.get("pins");
+  const target = sender && sender.tab ? { tabId: sender.tab.id, frameId: sender.frameId || 0 } : {};
+  const r = TCWChatLib.addPin(d.pins, { ...pin, ...target, by });
+  await browser.storage.local.set({ pins: r.pins });
+  return { added: r.added };
+}
+
+browser.menus.create(
+  {
+    id: "tcw-pin",
+    title: "Pin this message",
+    contexts: ["all"],
+    documentUrlPatterns: ["*://*.twitch.tv/*"]
+  },
+  () => void browser.runtime.lastError
+);
+
+browser.menus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "tcw-pin" || !tab) return;
+  const opts = { frameId: info.frameId || 0 };
+  let m = null;
+  try {
+    m = await browser.tabs.sendMessage(tab.id, { type: "getContextMessage" }, opts);
+  } catch (e) { /* page not ready */ }
+  let text;
+  if (!m || !m.text) {
+    text = "Right-click directly on a chat message to pin it.";
+  } else {
+    await serial(() => addPinned(m, { tab, frameId: info.frameId || 0 }, "you"));
+    text = "Pinned · see the Pins tab";
+  }
+  browser.tabs.sendMessage(tab.id, { type: "toast", text }, opts).catch(() => {});
+});
 
 browser.menus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== "tcw-watch" || !tab) return;

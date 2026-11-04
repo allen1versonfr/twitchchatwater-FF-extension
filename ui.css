@@ -457,3 +457,11 @@ body.full .set-nav { flex-wrap: wrap; overflow: visible; }
 .whats-new { margin: 0 0 14px; align-items: flex-start; }
 .wn-links { display: flex; gap: 14px; margin-top: 6px; }
 @media (prefers-reduced-motion: reduce) { .chev { transition: none; } .group.flash { animation: none; } }
+
+/* ---------- pins ---------- */
+.pin .entry-head .icon-btn { padding: 0 4px; font-size: 12px; opacity: .6; }
+.pin .entry-head .icon-btn:hover { opacity: 1; }
+.pin .time { margin-left: auto; }
+.pin-tag { white-space: nowrap; }
+[data-panel="pins"] .list-tools .seg { flex: 0 1 auto; }
+[data-panel="pins"] .text { white-space: pre-wrap; }

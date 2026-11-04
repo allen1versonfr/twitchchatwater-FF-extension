@@ -150,6 +150,7 @@
   function jump(name, id) {
     showTab(name);
     const p = panel(name);
+    if (!p || !p._tools || !id) return;
     if (p._tools.search.value) { p._tools.search.value = ""; filter(name, ""); }
     const g = document.getElementById(id);
     if (!g) return;

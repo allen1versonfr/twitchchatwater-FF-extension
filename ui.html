@@ -19,6 +19,7 @@
   <nav class="tabs">
     <button data-tab="people">People</button>
     <button data-tab="activity">Activity <span id="activityPill" class="pill" hidden></span></button>
+    <button data-tab="pins" title="Pinned messages">Pins</button>
     <button data-tab="chat">Chat</button>
     <button data-tab="paints">Paints</button>
     <button data-tab="settings">Settings</button>
@@ -80,6 +81,28 @@
       </div>
     </section>
 
+    <!-- PINS -->
+    <section data-panel="pins" hidden>
+      <div class="list-tools">
+        <input id="pinFilter" type="search" placeholder="Search pinned messages" aria-label="Search pinned messages">
+        <select id="pinChannel" aria-label="Filter by channel"><option value="">All channels</option></select>
+      </div>
+      <div class="list-tools">
+        <div class="seg" role="group" aria-label="Who pinned it">
+          <button type="button" data-pinby="" class="on" aria-pressed="true">All</button>
+          <button type="button" data-pinby="twitch" aria-pressed="false" title="Pinned in Twitch chat">In chat</button>
+          <button type="button" data-pinby="you" aria-pressed="false" title="Pinned by you">By you</button>
+        </div>
+        <span id="pinCount" class="muted"></span>
+      </div>
+      <div id="pins" class="list"></div>
+      <div class="opt"><span class="lbl">Save messages pinned in Twitch chat<small>Keeps a copy of every pinned message you see, even after it's unpinned</small></span>
+        <span class="switch"><input type="checkbox" data-setting="pinsAuto"><span></span></span></div>
+      <div class="opt"><span class="lbl">Clear pinned history<small>Only on this computer</small></span>
+        <button id="clearPins" class="btn danger small">Clear</button></div>
+      <p class="hint">Pin any chat message yourself: right-click it and choose <b>Pin this message</b>.</p>
+    </section>
+
     <!-- CHAT -->
     <section data-panel="chat" hidden>
       <div class="group" id="grp-emotes">
@@ -96,9 +119,9 @@
           <span class="switch"><input type="checkbox" data-setting="emoteLive"><span></span></span></div>
         <div class="opt"><span class="lbl">Emote menu button (☺)<small>Next to the chat box: favorites, recently used, your most used, popular in this chat, 7TV</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteMenu"><span></span></span></div>
-        <div class="opt"><span class="lbl">Suggestions while typing “;” <span class="new">New</span><small>Type ;kek to see matching emotes (just ; shows your most used); Tab or Enter inserts one. Suggestions learn from what you send, in which channel, and what you pick.</small></span>
+        <div class="opt"><span class="lbl">Suggestions while typing “;”<small>Type ;kek to see matching emotes (just ; shows your most used); Tab or Enter inserts one. Suggestions learn from what you send, in which channel, and what you pick.</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteColon"><span></span></span></div>
-        <div class="opt"><span class="lbl">Suggest emotes as you type <span class="new">New</span><small>Like 7TV: matching emotes pop up for every word, no “;” needed. Tab inserts the highlighted one; Enter still sends your message.</small></span>
+        <div class="opt"><span class="lbl">Suggest emotes as you type<small>Like 7TV: matching emotes pop up for every word, no “;” needed. Tab inserts the highlighted one; Enter still sends your message.</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteSugAlways"><span></span></span></div>
         <div class="opt"><span class="lbl">Tab completion<small>Type part of a name and press Tab to cycle through matching emotes (Shift+Tab goes back)</small></span>
           <span class="switch"><input type="checkbox" data-setting="emoteTab"><span></span></span></div>
@@ -107,9 +130,9 @@
         <div class="opt"><span class="lbl">Spam means<small>Messages with the same emote within 10 seconds, from at least this many people</small></span>
           <input type="number" min="2" max="50" step="1" data-setting="spamMin" aria-label="Messages">
           <input type="number" min="1" max="50" step="1" data-setting="spamUsers" aria-label="People"></div>
-        <div class="opt"><span class="lbl">Spam popup opacity <span class="new">New</span><small>From almost clear to solid; it turns solid while your mouse is over it</small></span>
+        <div class="opt"><span class="lbl">Spam popup opacity<small>From almost clear to solid; it turns solid while your mouse is over it</small></span>
           <input type="range" min="10" max="100" step="5" data-setting="spamOpacity" aria-label="Spam popup opacity"><output data-for="spamOpacity"></output></div>
-        <div class="opt"><span class="lbl">Bypass duplicate message check <span class="new">New</span><small>Like 7TV: send the same message again within 30 seconds. An invisible character is added to every other repeat so Twitch accepts it. In emote-only chat it's skipped (Twitch would reject it), unless you're a moderator or the broadcaster.</small></span>
+        <div class="opt"><span class="lbl">Bypass duplicate message check<small>Like 7TV: send the same message again within 30 seconds. An invisible character is added to every other repeat so Twitch accepts it. In emote-only chat it's skipped (Twitch would reject it), unless you're a moderator or the broadcaster.</small></span>
           <span class="switch"><input type="checkbox" data-setting="dupBypass"><span></span></span></div>
         <div class="opt"><span class="lbl">Message history<small>↑ / ↓ in an empty chat box brings back what you sent (this tab only)</small></span>
           <span class="switch"><input type="checkbox" data-setting="inputHistory"><span></span></span></div>
@@ -274,10 +297,11 @@
     <section data-panel="settings" hidden>
       <div id="whatsNew" class="notice whats-new" hidden>
         <div><b>New in this version</b>
-          <small><b>Unmute VODs</b> restores audio Twitch muted · emote suggestions now open with <b>;</b> · the emote-spam popup has an opacity slider.</small>
+          <small><b>Stable volume</b> evens out loud and quiet moments · <b>Read aloud</b> speaks highlighted messages while you're in another app · the new <b>Pins</b> tab keeps pinned chat messages.</small>
           <span class="wn-links">
-            <button type="button" class="set-link" data-jump="settings:grp-vods">VOD settings</button>
-            <button type="button" class="set-link" data-jump="chat:grp-emotes">Emote settings</button>
+            <button type="button" class="set-link" data-jump="settings:grp-player">Stable volume</button>
+            <button type="button" class="set-link" data-jump="settings:grp-tts">Read aloud</button>
+            <button type="button" class="set-link" data-jump="pins">Pins tab</button>
           </span></div>
         <button type="button" id="whatsNewClose" class="icon-btn" title="Dismiss" aria-label="Dismiss">×</button>
       </div>
@@ -311,6 +335,28 @@
           <input type="text" data-setting="mentionName" spellcheck="false" autocomplete="off"></div>
       </div>
 
+      <div class="group" id="grp-tts">
+        <h2>Read aloud</h2>
+        <div class="opt"><span class="lbl">Read highlighted messages aloud <span class="new">New</span><small>Text-to-speech for messages with your highlighted words or badges, using your computer's voices</small></span>
+          <span class="switch"><input type="checkbox" data-setting="ttsOn"><span></span></span></div>
+        <div class="opt"><span class="lbl">When</span>
+          <select data-setting="ttsWhen">
+            <option value="unfocused">Only when Firefox isn't in focus</option>
+            <option value="always">Always</option>
+          </select></div>
+        <div class="opt"><span class="lbl">Also read watchlist messages<small>Messages from people on your watchlist</small></span>
+          <span class="switch"><input type="checkbox" data-setting="ttsWatch"><span></span></span></div>
+        <div class="opt"><span class="lbl">Also read @mentions and replies to you</span>
+          <span class="switch"><input type="checkbox" data-setting="ttsMentions"><span></span></span></div>
+        <div class="opt"><span class="lbl">Voice</span>
+          <select data-setting="ttsVoice" id="ttsVoice"><option value="">System default</option></select>
+          <button id="ttsTest" class="icon-btn" title="Test the voice" aria-label="Test the voice">▶</button></div>
+        <div class="opt"><span class="lbl">Speed</span>
+          <input type="range" min="0.6" max="2" step="0.1" data-setting="ttsRate"><output data-for="ttsRate"></output></div>
+        <div class="opt"><span class="lbl">Voice volume</span>
+          <input type="range" min="0.1" max="1" step="0.05" data-setting="ttsVolume"><output data-for="ttsVolume"></output></div>
+      </div>
+
       <div class="group">
         <h2>Watchlist highlight</h2>
         <div class="opt"><span class="lbl">Style</span>
@@ -338,12 +384,19 @@
 
       <div class="group" id="grp-vods">
         <h2>VODs</h2>
-        <div class="opt"><span class="lbl">Unmute VODs <span class="new">New</span><small>Parts of a VOD that Twitch muted play with their original audio, as long as Twitch still has it (usually within about a day of the stream). Anything that's gone simply stays muted. Takes effect when a VOD is opened or reloaded.</small></span>
+        <div class="opt"><span class="lbl">Unmute VODs<small>Parts of a VOD that Twitch muted play with their original audio, as long as Twitch still has it (usually within about a day of the stream). Anything that's gone simply stays muted. Takes effect when a VOD is opened or reloaded.</small></span>
           <span class="switch"><input type="checkbox" data-setting="vodUnmute"><span></span></span></div>
       </div>
 
-      <div class="group">
+      <div class="group" id="grp-player">
         <h2>Player &amp; audio</h2>
+        <div class="opt"><span class="lbl">Stable volume <span class="new">New</span><small>Evens out loud and quiet moments automatically, so you don't have to keep adjusting the volume. Loud parts are turned down within a moment; quiet parts are raised gently; silence is never boosted. Also in the player's 🎚 menu.</small></span>
+          <select data-setting="audioLevel">
+            <option value="off">Off</option>
+            <option value="gentle">Gentle (±6 dB)</option>
+            <option value="normal">Normal (±12 dB)</option>
+            <option value="strong">Strong (±18 dB)</option>
+          </select></div>
         <div class="opt"><span class="lbl">Show the stream delay ⏳<small>In the player's control bar and next to the viewer count: how far behind the streamer you are. Click it to jump closer to live.</small></span>
           <span class="switch"><input type="checkbox" data-setting="delayBadge"><span></span></span></div>
         <div class="opt"><span class="lbl">Audio compressor<small>Quiet parts louder, loud parts quieter. A safety limiter stops clipping.</small></span>
@@ -473,6 +526,7 @@
 <script src="chatlib.js"></script>
 <script src="ui.js"></script>
 <script src="ui-settings.js"></script>
+<script src="ui-pins.js"></script>
 <script src="ui-paints.js"></script>
 <script src="ui-watch.js"></script>
 <script src="ui-chat.js"></script>
