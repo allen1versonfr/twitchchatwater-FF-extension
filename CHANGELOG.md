@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.10.0
+
+- **A roomier, easier-to-navigate menu.**
+  - Settings now opens on a list of categories (Alerts & read aloud, Chat, Emotes, Highlights & filters, Player & audio,
+    Moderation, Auto-claim, Nametag paints, Watch time, Sync & data), each with an icon and a summary of what's inside.
+    Pick one to see just its options, with a back button. In a full tab the categories stay in a sidebar.
+  - The old Chat tab is gone: its options are in Settings with everything else, and one search box finds any of them
+    (with the category it's in).
+  - Fewer, bigger tabs with icons: People, Activity, Pins, Paints, Settings. Status moved to the header, with a green
+    dot when chat is being read.
+  - Wider popup, options shown as cards with more space between them and easier-to-read descriptions.
+
 ## 3.9.0
 
 **Pins**

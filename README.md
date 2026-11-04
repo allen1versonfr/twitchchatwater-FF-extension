@@ -32,12 +32,12 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
   channel's pins. Stored only on this computer.
 - **Read aloud**: text-to-speech for your highlighted messages (optionally also watchlist messages and @mentions), only
   while Firefox isn't the app you're using or the Twitch tab is out of view (your choice), or always. Emote names are left
-  out unless you turn them on, repeats are skipped, and the voice, speed and volume are yours to pick (Settings → Read aloud).
-- **Status tab** showing whether each open Twitch tab's chat is being read, plus a test button.
+  out unless you turn them on, repeats are skipped, and the voice, speed and volume are yours to pick (Settings → Alerts & read aloud).
+- **Status** (the button in the popup's header, with a green dot when chat is being read): each open Twitch tab's state, plus a test button.
 - Right-click any chat message, then pick **Watch this chat user**.
 - Backup and restore your watchlist as a file.
 - **Mention & reply alerts**: a sound (and optional desktop notification) when someone @mentions you or replies to you.
-  Your Twitch name is detected automatically; change the sound or turn it off in Settings → Mentions & replies to you.
+  Your Twitch name is detected automatically; change the sound or turn it off in Settings → Alerts & read aloud.
 - **Watch time**: how long you've watched each streamer, shown next to the viewer count and in Activity → Watch time.
   See [Watch time](#watch-time).
 - **Nametag paints** (free): give your name a solid color, gradient, radial or animated rainbow, with glow, outline and weight.
@@ -45,7 +45,7 @@ It updates itself when a new release comes out. Needs Firefox 140 or newer.
 - **Player**: stable volume, stream delay, refresh button, audio compressor, volume boost, mono, scroll-wheel volume, volume per channel, VOD unmute.
   See [Player and audio](#player-and-audio).
 - **Chat tools, moderation and auto-claim**: 7TV emotes, an emote menu, highlights, filters, deleted-message recovery and more.
-  See [Chat tools](#chat-tools). They're all in the **Chat** tab.
+  See [Chat tools](#chat-tools). They're in **Settings**, sorted into categories (Chat, Emotes, Highlights & filters, Moderation, Auto-claim…).
 
 <img src="docs/popup.png" alt="Toolbar popup" width="300">
 
@@ -68,7 +68,7 @@ In **Settings → Player & audio**, and from the 🎚 button in the player contr
 - **Volume per channel**: each channel remembers its own volume.
 - **VOD unmute**: parts of a VOD that Twitch muted play with their original audio when Twitch still has it
   (usually within about a day of the stream). Anything that's already gone falls back to the muted audio, so playback
-  never breaks. Turn it off under Settings → VODs → Unmute VODs.
+  never breaks. Turn it off under Settings → Player & audio → Unmute VODs.
 - **Refresh button** (⟳) in the player's control bar: reloads the stream when it freezes or keeps buffering, without
   reloading the page. VODs stay where they were. If Twitch's player can't be reached, it reloads the page instead.
 
@@ -77,7 +77,7 @@ Audio processing only starts once you turn on the compressor, boost or mono, and
 
 ## Chat tools
 
-Everything here can be turned on or off in the **Chat** tab.
+Everything here can be turned on or off in **Settings** (search for it, or open its category).
 
 **Emotes**
 - **7TV, BTTV and FFZ emotes** in chat: each channel's emotes plus the global ones, including zero-width (overlay) emotes,
@@ -89,7 +89,7 @@ Everything here can be turned on or off in the **Chat** tab.
 - **Emote menu** (☺ next to Twitch's chat settings button): your favorites, recently used, your most used,
   popular in this chat, and the channel's and global 7TV emotes, with search. Click to add one to your message.
 - **Favorites**: right-click any emote in chat (Favorite emote) or in the menu.
-- **Usage tracking**: the emotes you send are counted (only yours, only on this computer). Your top emotes show in the menu and in the Chat tab.
+- **Usage tracking**: the emotes you send are counted (only yours, only on this computer). Your top emotes show in the menu and in Settings → Emotes.
 - **`;` suggestions**: type `;kek` to see matching emotes (just `;` lists your most used); ↑/↓ to pick, Tab or Enter to insert.
 - **Suggestions that learn**: ranked by what you send (recent use counts more), what you send in this channel, which emote you picked
   for what you typed, and what chat is spamming right now. Stays on this computer.
@@ -99,7 +99,7 @@ Everything here can be turned on or off in the **Chat** tab.
   a button pops up above the chat box that sends that emote for you. Up to 3 spammed emotes show at once, and you can press
   Send as many times as you like (repeats get an invisible character so Twitch doesn't block them as duplicates).
   Nothing is ever sent without your click.
-  The popup's opacity is adjustable from almost clear to solid (Chat → Emotes → Spam popup opacity); it turns solid while you hover it.
+  The popup's opacity is adjustable from almost clear to solid (Settings → Emotes → Spam popup opacity); it turns solid while you hover it.
 - **Bypass duplicate message check** (like 7TV): send the same message twice within 30 seconds; every other repeat gets an
   invisible character so Twitch accepts it. Skipped in emote-only chat, where Twitch would reject it (moderators and the
   broadcaster are exempt from emote-only, so it keeps working for them).
@@ -141,10 +141,10 @@ Everything here can be turned on or off in the **Chat** tab.
   [twitch.tv/drops/inventory](https://www.twitch.tv/drops/inventory) while that page is open.
 - Optional: **check Drops in the background** every 30 minutes while you have Twitch open (opens the inventory in a muted
   background tab, claims, and closes it).
-- It only presses Twitch's own buttons, the same ones you'd click. Counts show in the Chat tab.
+- It only presses Twitch's own buttons, the same ones you'd click. Counts show in Settings → Auto-claim.
 
 **How it knows about deleted messages and bans:** the add-on opens its own read-only, logged-out connection to Twitch chat
-(the same kind a signed-out viewer uses) for the channels you have open. You can turn it off under Chat → Connection;
+(the same kind a signed-out viewer uses) for the channels you have open. You can turn it off under Settings → Chat → Connection;
 deleted-message recovery, ban/timeout lines, the moderation log, first-time chatter marks and shared-chat hiding then stop working.
 
 Twitch changes its page from time to time. If a chat tool stops working after a Twitch update, the rest of the add-on keeps working.
@@ -195,8 +195,8 @@ The add-on reads chat on twitch.tv pages and keeps everything in your browser. T
 - **Firefox Sync** (if you're signed in to Firefox with Add-ons sync on): your watchlist and settings. You can turn it off in Settings.
 - **Publishing a paint**: your Twitch user ID, username and that one paint go to the paint server. Unpublish any time.
 - **Show other people's paints** (off until you turn it on): the usernames you see in chat are sent to the paint server so it can look up their paints. Nothing else is sent: no messages, cookies or account info.
-- **Connect to chat directly** (Chat tab, on by default): a logged-out, read-only connection to Twitch's chat server (`irc-ws.chat.twitch.tv`) joins the channels you have open. It never signs in and never sends messages.
-- **7TV, BTTV and FFZ emotes** (Chat tab, each on by default and each can be turned off): the channel's Twitch user ID is looked up from Twitch and sent to 7TV (`7tv.io`), BetterTTV (`api.betterttv.net`) and FrankerFaceZ (`api.frankerfacez.com`) to get its emote lists. Emote images load from their servers.
+- **Connect to chat directly** (Settings → Chat, on by default): a logged-out, read-only connection to Twitch's chat server (`irc-ws.chat.twitch.tv`) joins the channels you have open. It never signs in and never sends messages.
+- **7TV, BTTV and FFZ emotes** (Settings → Emotes, each on by default and each can be turned off): the channel's Twitch user ID is looked up from Twitch and sent to 7TV (`7tv.io`), BetterTTV (`api.betterttv.net`) and FrankerFaceZ (`api.frankerfacez.com`) to get its emote lists. Emote images load from their servers.
 - **Live emote updates and personal emotes** (on by default): the add-on keeps a connection to 7TV's event service (`events.7tv.io`) and BetterTTV's (`sockets.betterttv.net`) for the channels you have open, telling them only which channel it's watching. Nothing about you is sent.
 
 Chat messages, your activity history, your pinned messages, your watch time, your emote usage and the moderation log are never sent anywhere.
@@ -208,7 +208,7 @@ Read aloud uses the voices installed on your computer through Firefox.
 2. Make sure the top switch is on and the person's switch is on.
 3. If **Only these channels** has anything in it, the channel you're on must be listed.
 4. Messages in the first few seconds after opening a channel are treated as history and don't beep
-   (Settings → "Ignore old messages for").
+   (Settings → Alerts & read aloud → "Ignore old messages for").
 5. Turn on **Debug logging** and check the Twitch tab's console (F12) for `[Chat Watcher]` lines.
 
 ## Making a release (maintainers)
