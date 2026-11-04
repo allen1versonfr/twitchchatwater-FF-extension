@@ -442,9 +442,19 @@ function bindData() {
 
 // ---------- status ----------
 
+// The dot on the header's Status button: green when a Twitch tab's chat is being read.
+function renderStatusDot(list) {
+  const dot = $("#statusDot");
+  if (!dot) return;
+  const good = (list || []).some((s) => s.chatFound && s.enabled && s.allowed);
+  dot.className = "dot " + (good ? "ok" : list && list.length ? "bad" : "");
+  $("#statusBtn").title = good ? "Status: reading chat" : list && list.length ? "Status: open a channel with chat showing" : "Status: no Twitch tab open";
+}
+
 async function renderStatus() {
   let list = [];
   try { list = await send("getStatus"); } catch (e) { /* background starting */ }
+  renderStatusDot(list);
   const box = $("#status");
   if (!list || !list.length) {
     box.replaceChildren(h("div", { class: "empty" },
@@ -505,6 +515,7 @@ function bindStatus() {
 // ---------- tabs + wiring ----------
 
 function showTab(name) {
+  if (name === "chat") name = "settings"; // the Chat tab's options now live in Settings
   if (!$(`[data-panel='${name}']`)) name = "people";
   $$("[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   $$("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== name; });
@@ -582,6 +593,7 @@ async function init() {
   if (start === "modlog") start = "activity"; // ui-watch.js opens the Mod log view
   if (!start) { try { start = localStorage.getItem("tcw-tab") || "people"; } catch (e) { start = "people"; } }
   showTab(start);
+  send("getStatus").then(renderStatusDot).catch(() => {});
   send("clearBadge").catch(() => {});
   if (isPopup) $("#addInput").focus();
 }

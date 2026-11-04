@@ -7,6 +7,7 @@
  * so it's re-checked every 10 minutes while the channel is open. */
 
 const EMOTE_TTL = 10 * 60 * 1000;
+const EMOTE_RETRY = 60 * 1000; // after a failed lookup, try again this soon (instead of waiting the full TTL)
 const emoteSubs = new Map(); // "tabId:frameId" -> { tabId, frameId, channel, t }
 const chanEmotes = new Map(); // channel -> rec | Promise
 let globalSets = null; // { seven, bttv, ffz, have: {seven, bttv, ffz}, t }
@@ -29,34 +30,39 @@ async function fetchGlobals(want) {
   if (want.bttv) jobs.push(getJson("https://api.betterttv.net/3/cached/emotes/global").then((d) => { g.bttv = (Array.isArray(d) ? d : []).map(L.bttvEmote).filter(Boolean); }));
   if (want.ffz) jobs.push(getJson("https://api.frankerfacez.com/v1/set/global").then((d) => { g.ffz = L.ffzSets(d, d && d.default_sets); }));
   const results = await Promise.allSettled(jobs);
-  if (results.some((r) => r.status === "rejected") && globalSets) {
-    // keep what we had for a provider that failed this time
-    for (const k of ["seven", "bttv", "ffz"]) if (want[k] && !g[k].length) g[k] = globalSets[k] || [];
+  if (results.some((r) => r.status === "rejected")) {
+    // keep what we had for a provider that failed this time, and try again in a minute rather than an hour
+    if (globalSets) for (const k of ["seven", "bttv", "ffz"]) if (want[k] && !g[k].length) g[k] = globalSets[k] || [];
+    g.t = Date.now() - 60 * 60 * 1000 + EMOTE_RETRY;
   }
   globalSets = g;
   return g;
 }
 
 async function fetchChannel(channel, want) {
-  const rec = { room: "", seven: [], sevenSet: "", sevenUser: "", bttv: [], ffz: [], have: { ...want }, t: Date.now() };
+  const rec = { room: "", seven: [], sevenSet: "", sevenUser: "", bttv: [], ffz: [], have: { ...want }, failed: {}, t: Date.now() };
   rec.room = await roomIdFor(channel).catch(() => "");
-  if (!rec.room) return rec;
+  if (!rec.room) {
+    rec.failed = { room: true, seven: true, bttv: true, ffz: true };
+    return rec;
+  }
   const jobs = [];
+  const tag = (k, p) => p.catch((err) => { rec.failed[k] = true; throw err; });
   if (want.seven) {
-    jobs.push(getJson("https://7tv.io/v3/users/twitch/" + rec.room).then((d) => {
+    jobs.push(tag("seven", getJson("https://7tv.io/v3/users/twitch/" + rec.room).then((d) => {
       const set = d && d.emote_set;
       rec.seven = L.sevenTvSet(set && set.emotes);
       rec.sevenSet = set && /^[0-9a-z]{1,40}$/i.test(set.id || "") ? set.id : "";
       rec.sevenUser = d && d.user && /^[0-9a-z]{1,40}$/i.test(d.user.id || "") ? d.user.id : "";
-    }));
+    })));
   }
   if (want.bttv) {
-    jobs.push(getJson("https://api.betterttv.net/3/cached/users/twitch/" + rec.room).then((d) => {
+    jobs.push(tag("bttv", getJson("https://api.betterttv.net/3/cached/users/twitch/" + rec.room).then((d) => {
       rec.bttv = [...(d && Array.isArray(d.channelEmotes) ? d.channelEmotes : []), ...(d && Array.isArray(d.sharedEmotes) ? d.sharedEmotes : [])]
         .map(L.bttvEmote).filter(Boolean);
-    }));
+    })));
   }
-  if (want.ffz) jobs.push(getJson("https://api.frankerfacez.com/v1/room/id/" + rec.room).then((d) => { rec.ffz = L.ffzSets(d); }));
+  if (want.ffz) jobs.push(tag("ffz", getJson("https://api.frankerfacez.com/v1/room/id/" + rec.room).then((d) => { rec.ffz = L.ffzSets(d); })));
   const results = await Promise.allSettled(jobs);
   for (const r of results) if (r.status === "rejected") console.warn("[Chat Watcher] emote lookup failed for", channel, r.reason);
   return rec;
@@ -86,7 +92,9 @@ async function ensureEmotes(channel, force) {
   if (cur && cur.then) return cur;
   if (!force && cur && Date.now() - cur.t < EMOTE_TTL && covers(cur.have, want)) return cur;
   const job = (async () => {
-    const [rec] = await Promise.all([fetchChannel(channel, want), fetchGlobals(want)]);
+    const [fresh] = await Promise.all([fetchChannel(channel, want), fetchGlobals(want)]);
+    const rec = L.keepWorking(cur && !cur.then ? cur : null, fresh);
+    if (Object.keys(fresh.failed).length) rec.t = Date.now() - EMOTE_TTL + EMOTE_RETRY; // try again soon
     chanEmotes.set(channel, rec);
     if (chanEmotes.size > 50) chanEmotes.delete(chanEmotes.keys().next().value);
     const changes = diff(cur && !cur.then ? cur : null, rec);
@@ -156,9 +164,14 @@ function personalAdd(ent) {
     if (!settings.emotes7tv || !settings.emotesPersonal) return;
     let set = personalSets.get(ent.ref);
     if (!set || Date.now() - set.t > 30 * 60000) {
-      const d = await getJson("https://7tv.io/v3/emote-sets/" + ent.ref).catch(() => null);
-      set = { emotes: L.sevenTvSet(d && d.emotes), t: Date.now() };
-      personalSets.set(ent.ref, set);
+      let failed = false;
+      const d = await getJson("https://7tv.io/v3/emote-sets/" + ent.ref).catch(() => { failed = true; return null; });
+      if (failed) {
+        if (!set) return; // try again the next time this person chats; don't remember "no emotes"
+      } else {
+        set = { emotes: L.sevenTvSet(d && d.emotes), t: Date.now() };
+        personalSets.set(ent.ref, set);
+      }
       if (personalSets.size > 1000) personalSets.delete(personalSets.keys().next().value);
     }
     personal.delete(ent.login);

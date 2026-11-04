@@ -182,13 +182,21 @@
     for (const line of C.lines()) if (line.isConnected && (!onlyLogin || C.loginOf(line) === onlyLogin)) render7tv(line);
   }
 
-  async function load7tv(ch) {
-    seven = { channel: new Map(), global: seven.global, ch };
+  async function load7tv(ch, attempt = 0) {
+    if (!attempt) seven = { channel: new Map(), global: seven.global, ch };
     if (!ch || !anyProvider()) return;
+    let r = null;
     try {
-      const r = await browser.runtime.sendMessage({ type: "emotes:get", channel: ch });
-      if (r) apply7tv(ch, r);
+      r = await browser.runtime.sendMessage({ type: "emotes:get", channel: ch });
     } catch (e) { /* background restarting; it pushes the list when ready */ }
+    if (r && (r.emotes || []).length + (r.global || []).length) return apply7tv(ch, r);
+    if (r) apply7tv(ch, r);
+    // nothing yet (a lookup failed or is still running): ask again shortly rather than waiting a minute
+    if (attempt < 3) {
+      setTimeout(() => {
+        if (C.currentChannel() === ch && !seven.channel.size && !seven.global.size) load7tv(ch, attempt + 1);
+      }, 10000 * (attempt + 1));
+    }
   }
 
   function apply7tv(ch, r) {
@@ -984,7 +992,13 @@
   // keeps live emote updates coming for this channel (and picks up FFZ changes every 10 minutes)
   setInterval(() => {
     const ch = C.currentChannel();
-    if (ch && anyProvider() && document.querySelector(C.CONTAINER_SEL)) browser.runtime.sendMessage({ type: "emotes:get", channel: ch }).catch(() => {});
+    if (!ch || !anyProvider() || !document.querySelector(C.CONTAINER_SEL)) return;
+    browser.runtime.sendMessage({ type: "emotes:get", channel: ch }).then((r) => {
+      // repair this page if it missed an update or lost its list (e.g. a lookup failed when the channel opened)
+      if (r && ch === C.currentChannel() && (seven.ch !== ch || seven.channel.size !== (r.emotes || []).length || seven.global.size !== (r.global || []).length)) {
+        apply7tv(ch, r);
+      }
+    }).catch(() => {});
   }, 60000);
 
   C.emotes = { search, catalog, sevenGet, lineEmotes, withoutEmotes };
