@@ -321,3 +321,37 @@ test("addPin keeps one copy per message, newest first, and remembers you pinned 
   assert.equal(L.addPin(r.pins, { text: "   " }).added, false);
   assert.equal(L.addPin(Array.from({ length: 5 }, (_, i) => ({ ch: "c", login: "u", text: "t" + i })), { text: "new" }, 5).pins.length, 5);
 });
+
+test("levelerStep ducks a sudden blast at once and can leave names out of speech", () => {
+  let st = null;
+  for (let t = 0; t < 10; t += 0.05) st = L.levelerStep(st, -32, 0.05, "normal"); // quiet stream, boosted
+  assert.ok(st.gain > 11);
+  const blast = L.levelerStep(st, -4, 0.05, "normal"); // jump scare: 28 dB louder in one step
+  assert.ok(blast.gain <= -20 + 6 + 4 + 1e-9, `ducked immediately (${blast.gain.toFixed(1)} dB)`);
+  assert.equal(L.ttsText("Bob", "", "hi", { names: false }), "hi");
+  assert.equal(L.ttsText("Bob", "chan", "hi", { names: false }), "In chan: hi");
+  assert.equal(L.ttsText("Bob", "", "hi", 50), "Bob: hi");
+});
+
+test("pins: Hype Chats from IRC, merging by Twitch's pin id, and ended pins", () => {
+  const hype = L.ircEvent(L.parseIrc("@display-name=Galaxy;id=h1;login=galaxy;pinned-chat-paid-amount=170;pinned-chat-paid-is-system-message=0;room-id=1 :galaxy!galaxy@galaxy.tmi.twitch.tv PRIVMSG #chan :SCIENCE"));
+  assert.equal(hype.paidPin, true);
+  const sys = L.ircEvent(L.parseIrc("@id=h2;pinned-chat-paid-amount=7500;pinned-chat-paid-is-system-message=1 :x!x@x.tmi.twitch.tv PRIVMSG #chan :User sent Hype Chat"));
+  assert.equal(sys.paidPin, undefined);
+
+  // read from the screen first (no id), then from React (with id and pinner): one pin, filled in
+  let r = L.addPin([], { ch: "chan", login: "viewer", display: "Viewer", text: "drop at 9", by: "twitch" });
+  r = L.addPin(r.pins, { ch: "chan", login: "viewer", display: "Viewer", text: "drop at 9", by: "twitch", pinId: "p1", pinner: "Mod" });
+  assert.equal(r.pins.length, 1);
+  assert.equal(r.pins[0].pinId, "p1");
+  assert.equal(r.pins[0].pinner, "Mod");
+  // same id, slightly different text (emote spacing) -> still the same pin
+  assert.equal(L.addPin(r.pins, { ch: "chan", login: "viewer", text: "drop  at 9 ", by: "twitch", pinId: "p1" }).pins.length, 1);
+
+  const ended = L.endPin(r.pins, { ch: "chan", pinId: "p1" }, 5000);
+  assert.equal(ended.ended, true);
+  assert.equal(ended.pins[0].endedAt, 5000);
+  assert.equal(L.endPin(ended.pins, { ch: "chan", pinId: "p1" }).ended, false);
+  // pinned again later: "ended" is cleared
+  assert.equal(L.addPin(ended.pins, { ch: "chan", login: "viewer", text: "drop at 9", by: "twitch", pinId: "p1" }).pins[0].endedAt, undefined);
+});

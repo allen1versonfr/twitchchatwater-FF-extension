@@ -98,6 +98,10 @@
       <div id="pins" class="list"></div>
       <div class="opt"><span class="lbl">Save messages pinned in Twitch chat<small>Keeps a copy of every pinned message you see, even after it's unpinned</small></span>
         <span class="switch"><input type="checkbox" data-setting="pinsAuto"><span></span></span></div>
+      <div class="opt"><span class="lbl">📌 button in chat<small>Next to the chat settings: shows this channel's pins without leaving Twitch</small></span>
+        <span class="switch"><input type="checkbox" data-setting="pinsButton"><span></span></span></div>
+      <div class="opt"><span class="lbl">Export pinned history<small>Everything shown above, as a text file</small></span>
+        <button id="exportPins" class="btn ghost small">Export</button></div>
       <div class="opt"><span class="lbl">Clear pinned history<small>Only on this computer</small></span>
         <button id="clearPins" class="btn danger small">Clear</button></div>
       <p class="hint">Pin any chat message yourself: right-click it and choose <b>Pin this message</b>.</p>
@@ -297,7 +301,7 @@
     <section data-panel="settings" hidden>
       <div id="whatsNew" class="notice whats-new" hidden>
         <div><b>New in this version</b>
-          <small><b>Stable volume</b> evens out loud and quiet moments · <b>Read aloud</b> speaks highlighted messages while you're in another app · the new <b>Pins</b> tab keeps pinned chat messages.</small>
+          <small><b>Pins</b> now catches every pinned message (plus a 📌 button in chat and export) · <b>Stable volume</b> reacts to sudden loud moments at once and remembers each channel · <b>Read aloud</b> skips emotes and can read whenever the Twitch tab is out of view.</small>
           <span class="wn-links">
             <button type="button" class="set-link" data-jump="settings:grp-player">Stable volume</button>
             <button type="button" class="set-link" data-jump="settings:grp-tts">Read aloud</button>
@@ -342,8 +346,13 @@
         <div class="opt"><span class="lbl">When</span>
           <select data-setting="ttsWhen">
             <option value="unfocused">Only when Firefox isn't in focus</option>
+            <option value="hidden">When the Twitch tab isn't in view</option>
             <option value="always">Always</option>
           </select></div>
+        <div class="opt"><span class="lbl">Say who wrote it<small>“Bob: …”. The channel is said only when it changes.</small></span>
+          <span class="switch"><input type="checkbox" data-setting="ttsNames"><span></span></span></div>
+        <div class="opt"><span class="lbl">Read emote names<small>Off: emotes are left out, and messages that are only emotes aren't read</small></span>
+          <span class="switch"><input type="checkbox" data-setting="ttsEmotes"><span></span></span></div>
         <div class="opt"><span class="lbl">Also read watchlist messages<small>Messages from people on your watchlist</small></span>
           <span class="switch"><input type="checkbox" data-setting="ttsWatch"><span></span></span></div>
         <div class="opt"><span class="lbl">Also read @mentions and replies to you</span>

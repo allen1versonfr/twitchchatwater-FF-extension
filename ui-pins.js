@@ -4,6 +4,12 @@
 (() => {
   let pins = [];
   let by = "";
+  let shown = [];
+
+  function dur(ms) {
+    const m = Math.round(ms / 60000);
+    return m < 1 ? "under a minute" : m < 60 ? m + " min" : Math.round(m / 6) / 10 + " h";
+  }
 
   function render() {
     const sel = $("#pinChannel");
@@ -17,6 +23,8 @@
       (!sel.value || p.ch === sel.value) && (!by || p.by === by) &&
       words.every((w) => `${p.display} ${p.login} ${p.text} ${p.ch} ${p.pinner || ""}`.toLowerCase().includes(w)));
     $("#pinCount").textContent = pins.length ? `${list.length} of ${pins.length}` : "";
+    shown = list;
+    $("#exportPins").disabled = !list.length;
 
     if (!list.length) {
       $("#pins").replaceChildren(h("div", { class: "empty" },
@@ -32,7 +40,11 @@
       });
       const unpin = h("button", { class: "icon-btn", title: "Remove from pins", "aria-label": "Remove from pins" }, "✕");
       unpin.addEventListener("click", (e) => { e.stopPropagation(); send("pins:remove", { id: p.id }); });
-      const who = p.by === "you" ? "📌 you" : p.pinner ? `📌 ${p.pinner}` : "📌 chat";
+      const who = p.by === "you" ? "📌 you" : p.paid ? "📌 Hype Chat" : p.pinner ? `📌 ${p.pinner}` : "📌 chat";
+      const status = p.by !== "twitch" ? null
+        : p.endedAt ? h("div", { class: "pin-status" }, `Pinned for ${dur(p.endedAt - (p.pinnedAt || p.time))}`)
+          : p.seenAt && Date.now() - p.seenAt < 12 * 60000 ? h("div", { class: "pin-status live" }, "Pinned now")
+            : null;
       return h("div", {
         class: "card entry pin",
         style: { "--c": userColor(p.login) },
@@ -45,7 +57,8 @@
           p.ch ? h("span", { class: "chan" }, "#" + p.ch) : null,
           h("span", { class: "time", title: new Date(p.pinnedAt || p.time).toLocaleString() }, ago(p.pinnedAt || p.time)),
           copy, unpin),
-        h("div", { class: "text" }, p.text));
+        h("div", { class: "text" }, p.text),
+        status);
     }));
   }
 
@@ -66,6 +79,19 @@
     });
   }
   armed($("#clearPins"), "Sure?", () => send("pins:clear"));
+  $("#exportPins").addEventListener("click", () => {
+    const lines = shown.map((p) => {
+      const when = new Date(p.pinnedAt || p.time).toLocaleString();
+      const who = p.by === "you" ? "pinned by you" : p.paid ? "Hype Chat" : p.pinner ? `pinned by ${p.pinner}` : "pinned in chat";
+      return `[${when}] #${p.ch} ${p.display || p.login} (${who}): ${p.text}`;
+    });
+    const url = URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/plain" }));
+    const a = h("a", { href: url, download: `pinned-messages-${new Date().toISOString().slice(0, 10)}.txt` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  });
   browser.storage.onChanged.addListener((ch, area) => {
     if (area === "local" && ch.pins) { pins = ch.pins.newValue || []; render(); }
   });

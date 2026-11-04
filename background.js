@@ -285,13 +285,29 @@ let firefoxFocused = true;
 browser.windows.getLastFocused().then((w) => { firefoxFocused = !!(w && w.focused); }).catch(() => {});
 browser.windows.onFocusChanged.addListener((id) => { firefoxFocused = id !== browser.windows.WINDOW_ID_NONE; });
 
-function speak(settings, display, channel, text) {
+const spokenRecently = new Map(); // message -> time, so the same message isn't read twice
+let lastSpokenChannel = "";
+
+// msg: the alert from the page ({ hidden, plain } come from content.js speechInfo)
+function speak(settings, display, channel, text, msg = {}) {
   if (!settings.ttsOn || !window.speechSynthesis) return;
-  if (settings.ttsWhen !== "always" && firefoxFocused) return;
+  // "unfocused": you're in another app · "hidden": ...or the Twitch tab is out of view · "always"
+  const away = !firefoxFocused || (settings.ttsWhen === "hidden" && msg.hidden === true);
+  if (settings.ttsWhen !== "always" && !away) return;
+  const words = String(settings.ttsEmotes ? text : typeof msg.plain === "string" ? msg.plain : text).trim();
+  if (!words) return; // nothing but emotes
+  const now = Date.now();
+  const key = String(display).toLowerCase() + "|" + words.toLowerCase();
+  if (now - (spokenRecently.get(key) || 0) < 60000) return;
+  spokenRecently.set(key, now);
+  if (spokenRecently.size > 300) for (const [k, t] of spokenRecently) if (now - t > 60000) spokenRecently.delete(k);
   const synth = window.speechSynthesis;
   // a busy chat shouldn't build a backlog: if one is already waiting, skip to the newest
   if (synth.pending) synth.cancel();
-  const u = new SpeechSynthesisUtterance(TCWChatLib.ttsText(display, channel, text));
+  // say the channel only when it changes, so one channel's messages aren't all prefixed with its name
+  const sayChannel = channel && channel !== lastSpokenChannel ? channel : "";
+  lastSpokenChannel = channel || lastSpokenChannel;
+  const u = new SpeechSynthesisUtterance(TCWChatLib.ttsText(display, sayChannel, words, { names: settings.ttsNames !== false }));
   const voice = settings.ttsVoice && synth.getVoices().find((v) => v.name === settings.ttsVoice);
   if (voice) u.voice = voice;
   u.rate = Math.max(0.5, Math.min(2, Number(settings.ttsRate) || 1));
@@ -354,7 +370,7 @@ async function onHit(msg, sender) {
   if (settings.notifications && user.notify) {
     notify(channel ? `${display} in #${channel}` : display, text || "sent a message", target);
   }
-  if (settings.ttsWatch) speak(settings, display, channel, text);
+  if (settings.ttsWatch) speak(settings, display, channel, text, msg);
   return result;
 }
 
@@ -396,7 +412,7 @@ async function onMention(msg, sender) {
       notify(kind === "reply" ? `${display} replied to you${where}` : `${display} mentioned you${where}`, text || " ", target);
     }
   }
-  if (settings.ttsMentions) speak(settings, display, channel, text);
+  if (settings.ttsMentions) speak(settings, display, channel, text, msg);
   return result;
 }
 
@@ -798,6 +814,13 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return serial(() => browser.storage.local.set({ log: [] }));
     case "pins:add":
       return serial(() => addPinned(msg.pin, sender, "twitch"));
+    case "pins:ended":
+      return serial(async () => {
+        if (!msg.pin || typeof msg.pin !== "object") return;
+        const d = await browser.storage.local.get("pins");
+        const r = TCWChatLib.endPin(d.pins, msg.pin);
+        if (r.ended) await browser.storage.local.set({ pins: r.pins });
+      });
     case "pins:remove":
       return serial(async () => {
         const d = await browser.storage.local.get("pins");

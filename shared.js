@@ -63,7 +63,9 @@ var TCW = (() => {
     hlFlash: true,             // flash the tab title for highlighted words
     hlNotify: false,
     ttsOn: false,              // read highlighted messages aloud
-    ttsWhen: "unfocused",      // unfocused (only while Firefox isn't the active app) | always
+    ttsWhen: "unfocused",      // unfocused (Firefox isn't the active app) | hidden (... or the Twitch tab is out of view) | always
+    ttsNames: true,            // say who wrote it
+    ttsEmotes: false,          // read emote names too (off: "hype KEKW KEKW" is read as "hype"; emote-only messages are skipped)
     ttsWatch: false,           // ... and messages from people on your watchlist
     ttsMentions: false,        // ... and @mentions / replies to you
     ttsVoice: "",              // voice name; blank = the system default
@@ -98,6 +100,7 @@ var TCW = (() => {
     autoDrops: true,           // claim Drops (in chat and on the inventory page)
     autoDropsBg: false,        // check the Drops inventory every 30 minutes in a background tab
     pinsAuto: true,            // keep a copy of messages pinned in Twitch chat (Pins tab)
+    pinsButton: true,          // 📌 button next to the chat settings: this channel's pins
     paintServer: "",           // override of TCW_CONFIG.paintServer
     twitchClientId: "",        // override of TCW_CONFIG.twitchClientId
     debug: false

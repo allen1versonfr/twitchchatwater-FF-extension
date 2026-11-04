@@ -251,6 +251,13 @@
     return out;
   }
 
+  // The message without its emotes, for reading aloud ("hype KEKW KEKW" -> "hype").
+  function withoutEmotes(line, text) {
+    const names = new Set(lineEmotes(line).map((e) => e.name));
+    const known = catalog(); // also emotes that didn't render as images
+    return String(text || "").split(/\s+/).filter((w) => w && !names.has(w) && !known.has(w)).join(" ");
+  }
+
   function onLine(line, info) {
     render7tv(line);
     if (!info.live) return;
@@ -980,5 +987,5 @@
     if (ch && anyProvider() && document.querySelector(C.CONTAINER_SEL)) browser.runtime.sendMessage({ type: "emotes:get", channel: ch }).catch(() => {});
   }, 60000);
 
-  C.emotes = { search, catalog, sevenGet, lineEmotes };
+  C.emotes = { search, catalog, sevenGet, lineEmotes, withoutEmotes };
 })();

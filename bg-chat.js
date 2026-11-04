@@ -160,6 +160,9 @@ const irc = {
       if (this.emotes7tv) ensureEmotes(ev.ch);
     }
     if (ev.k === "ban" || ev.k === "del" || ev.k === "clear") logModEvent(ev);
+    if (ev.k === "msg" && ev.paidPin) {
+      serial(() => addPinned({ ch: ev.ch, login: ev.login, display: ev.display, text: ev.text, pinId: ev.id, paid: true, time: ev.time }, null, "twitch"));
+    }
     deliver(ev.ch, ev);
   }
 };
@@ -359,7 +362,7 @@ async function onKeyword(msg, sender) {
     }
     if (settings.hlNotify) notify(`${display}${channel ? " in #" + channel : ""} · “${term}”`, text || " ", target);
   }
-  speak(settings, display, channel, text);
+  speak(settings, display, channel, text, msg);
   return result;
 }
 

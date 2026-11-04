@@ -241,7 +241,11 @@
     const level = ctx.createGain(); // stable volume: turned up and down by the leveler below
     const hp = ctx.createBiquadFilter(); // its ears: bass counts less, like loudness meters do
     hp.type = "highpass";
-    hp.frequency.value = 120;
+    hp.frequency.value = 100;
+    const shelf = ctx.createBiquadFilter(); // ...and presence/treble a bit more (roughly the K-weighting loudness meters use)
+    shelf.type = "highshelf";
+    shelf.frequency.value = 1500;
+    shelf.gain.value = 4;
     const meter = ctx.createAnalyser();
     meter.fftSize = 2048;
     const sink = ctx.createGain(); // keeps the meter running without adding sound
@@ -255,7 +259,8 @@
     limiter.ratio.value = 20;
     limiter.attack.value = 0.001;
     limiter.release.value = 0.1;
-    g = { src, mono, level, comp, makeup, boost, limiter, hp, meter, sink, lvl: null };
+    g = { src, mono, level, comp, makeup, boost, limiter, hp, shelf, meter, sink, lvl: rememberedLevel() };
+    if (g.lvl) level.gain.value = Math.pow(10, g.lvl.gain / 20);
     graphs.set(vid, g);
     wire(g);
     return g;
@@ -277,10 +282,12 @@
     if (leveling) {
       const tap = chain[chain.length - 1];
       tap.connect(g.hp);
-      g.hp.connect(g.meter);
+      g.hp.connect(g.shelf);
+      g.shelf.connect(g.meter);
       g.meter.connect(g.sink);
       g.sink.connect(ctx.destination);
-      if (!g.lvl) g.level.gain.value = 1;
+      if (!g.lvl) g.lvl = rememberedLevel();
+      g.level.gain.value = g.lvl ? Math.pow(10, g.lvl.gain / 20) : 1;
       chain.push(g.level);
     } else {
       g.lvl = null;
@@ -328,6 +335,35 @@
   let levelBuf = null;
   let levelAt = 0;
 
+  // Each channel's settled level is remembered, so a new stream, a refresh or the next visit starts at the right
+  // volume instead of taking a few seconds to find it. Stored only on this computer.
+  let levelMem = {};
+  let levelSaved = 0;
+  browser.storage.local.get("levelMem").then((d) => { levelMem = d.levelMem && typeof d.levelMem === "object" ? d.levelMem : {}; }).catch(() => {});
+
+  function levelKey() {
+    return channelNow() || (/^\/videos\/\d+/.test(location.pathname) ? "vod" : "");
+  }
+
+  function rememberedLevel() {
+    const m = levelOn() && levelMem[levelKey()];
+    if (!m || Date.now() - m.t > 30 * 86400000) return null;
+    return { gain: Number(m.gain) || 0, loud: Number(m.loud) || TCWChatLib.LEVEL_TARGET, hold: 0 };
+  }
+
+  function saveLevel(lvl) {
+    const key = levelKey();
+    if (!key || !lvl || Date.now() - levelSaved < 15000) return;
+    levelSaved = Date.now();
+    levelMem[key] = { gain: Math.round(lvl.gain * 10) / 10, loud: Math.round(lvl.loud * 10) / 10, t: Date.now() };
+    const keys = Object.keys(levelMem);
+    if (keys.length > 200) {
+      keys.sort((a, b) => levelMem[a].t - levelMem[b].t);
+      for (const k of keys.slice(0, keys.length - 200)) delete levelMem[k];
+    }
+    browser.storage.local.set({ levelMem }).catch(() => {});
+  }
+
   function levelTick() {
     if (!levelOn() || !ctx) return;
     const vid = mainVideo();
@@ -345,7 +381,8 @@
     // the element's own volume is applied before us; take it back out so your slider still means what it says
     const inDb = rms > 0 ? 20 * Math.log10(rms) - 20 * Math.log10(vid.volume) : -100;
     g.lvl = TCWChatLib.levelerStep(g.lvl, inDb, dt, S().audioLevel);
-    g.level.gain.setTargetAtTime(Math.pow(10, g.lvl.gain / 20), ctx.currentTime, 0.04);
+    g.level.gain.setTargetAtTime(Math.pow(10, g.lvl.gain / 20), ctx.currentTime, g.lvl.hold === 2 ? 0.005 : 0.04);
+    if (g.lvl.loud >= -50) saveLevel(g.lvl);
   }
   setInterval(levelTick, 50);
 
