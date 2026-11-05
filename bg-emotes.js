@@ -8,6 +8,9 @@
 
 const EMOTE_TTL = 10 * 60 * 1000;
 const EMOTE_RETRY = 60 * 1000; // after a failed lookup, try again this soon (instead of waiting the full TTL)
+// 7TV's v3 API sends a channel's whole emote set (2+ MB for big channels) and often takes 15-40 s to answer,
+// so the default 10 s timeout cut those lookups off every time.
+const SEVEN_TIMEOUT = 60 * 1000;
 const emoteSubs = new Map(); // "tabId:frameId" -> { tabId, frameId, channel, t }
 const chanEmotes = new Map(); // channel -> rec | Promise
 let globalSets = null; // { seven, bttv, ffz, have: {seven, bttv, ffz}, t }
@@ -26,7 +29,7 @@ async function fetchGlobals(want) {
   if (globalSets && Date.now() - globalSets.t < 60 * 60 * 1000 && covers(globalSets.have, want)) return globalSets;
   const g = { seven: [], bttv: [], ffz: [], have: { ...want }, t: Date.now() };
   const jobs = [];
-  if (want.seven) jobs.push(getJson("https://7tv.io/v3/emote-sets/global").then((d) => { g.seven = L.sevenTvSet(d && d.emotes); }));
+  if (want.seven) jobs.push(getJson("https://7tv.io/v3/emote-sets/global", { timeout: SEVEN_TIMEOUT }).then((d) => { g.seven = L.sevenTvSet(d && d.emotes); }));
   if (want.bttv) jobs.push(getJson("https://api.betterttv.net/3/cached/emotes/global").then((d) => { g.bttv = (Array.isArray(d) ? d : []).map(L.bttvEmote).filter(Boolean); }));
   if (want.ffz) jobs.push(getJson("https://api.frankerfacez.com/v1/set/global").then((d) => { g.ffz = L.ffzSets(d, d && d.default_sets); }));
   const results = await Promise.allSettled(jobs);
@@ -39,6 +42,46 @@ async function fetchGlobals(want) {
   return g;
 }
 
+// A channel's 7TV emotes. The v4 GraphQL API lets us ask for just the fields we use (~140 KB for a
+// 1000-emote set); v3 sends every image variant (2+ MB) and is slow enough to time out, so it's only the fallback.
+const SEVEN_V4_QUERY = `query ($id: String!, $page: Int!) { users { userByConnection(platform: TWITCH, platformId: $id) {
+  id style { activeEmoteSet { id emotes(page: $page, perPage: 1000) { totalCount items {
+    alias flags { zeroWidth } emote { id defaultName flags { animated } aspectRatio } } } } } } } }`;
+
+async function sevenChannelV4(room) {
+  let items = [];
+  let user = null;
+  for (let page = 1; page <= 5; page++) {
+    const d = await getJson("https://7tv.io/v4/gql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: SEVEN_V4_QUERY, variables: { id: room, page } }),
+      timeout: SEVEN_TIMEOUT
+    });
+    if (!d || !d.data || (d.errors && d.errors.length)) throw new Error("7TV v4: " + JSON.stringify((d && d.errors) || "no data").slice(0, 200));
+    user = d.data.users && d.data.users.userByConnection;
+    const set = user && user.style && user.style.activeEmoteSet;
+    if (!set) return { emotes: [], set: "", user: (user && user.id) || "" }; // not on 7TV, or no active set
+    const got = (set.emotes && set.emotes.items) || [];
+    items = items.concat(got);
+    if (!got.length || items.length >= Number(set.emotes.totalCount || 0)) return { emotes: L.sevenTvV4Set(items), set: set.id || "", user: user.id || "" };
+  }
+  return { emotes: L.sevenTvV4Set(items), set: user.style.activeEmoteSet.id || "", user: user.id || "" };
+}
+
+async function sevenChannelV3(room) {
+  const d = await getJson("https://7tv.io/v3/users/twitch/" + room, { timeout: SEVEN_TIMEOUT });
+  const set = d && d.emote_set;
+  return { emotes: L.sevenTvSet(set && set.emotes), set: (set && set.id) || "", user: (d && d.user && d.user.id) || "" };
+}
+
+function sevenChannel(room) {
+  return sevenChannelV4(room).catch((err) => {
+    console.warn("[Chat Watcher] 7TV v4 lookup failed, trying v3", err);
+    return sevenChannelV3(room);
+  });
+}
+
 async function fetchChannel(channel, want) {
   const rec = { room: "", seven: [], sevenSet: "", sevenUser: "", bttv: [], ffz: [], have: { ...want }, failed: {}, t: Date.now() };
   rec.room = await roomIdFor(channel).catch(() => "");
@@ -49,11 +92,10 @@ async function fetchChannel(channel, want) {
   const jobs = [];
   const tag = (k, p) => p.catch((err) => { rec.failed[k] = true; throw err; });
   if (want.seven) {
-    jobs.push(tag("seven", getJson("https://7tv.io/v3/users/twitch/" + rec.room).then((d) => {
-      const set = d && d.emote_set;
-      rec.seven = L.sevenTvSet(set && set.emotes);
-      rec.sevenSet = set && /^[0-9a-z]{1,40}$/i.test(set.id || "") ? set.id : "";
-      rec.sevenUser = d && d.user && /^[0-9a-z]{1,40}$/i.test(d.user.id || "") ? d.user.id : "";
+    jobs.push(tag("seven", sevenChannel(rec.room).then((r) => {
+      rec.seven = r.emotes;
+      rec.sevenSet = /^[0-9a-z]{1,40}$/i.test(r.set) ? r.set : "";
+      rec.sevenUser = /^[0-9a-z]{1,40}$/i.test(r.user) ? r.user : "";
     })));
   }
   if (want.bttv) {
@@ -165,7 +207,7 @@ function personalAdd(ent) {
     let set = personalSets.get(ent.ref);
     if (!set || Date.now() - set.t > 30 * 60000) {
       let failed = false;
-      const d = await getJson("https://7tv.io/v3/emote-sets/" + ent.ref).catch(() => { failed = true; return null; });
+      const d = await getJson("https://7tv.io/v3/emote-sets/" + ent.ref, { timeout: SEVEN_TIMEOUT }).catch(() => { failed = true; return null; });
       if (failed) {
         if (!set) return; // try again the next time this person chats; don't remember "no emotes"
       } else {

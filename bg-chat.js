@@ -209,11 +209,13 @@ function flushModLog() {
 
 const roomIds = new Map(); // channel -> Twitch user id
 
+// opts.timeout: ms before giving up (default 10 s); the rest of opts goes to fetch
 async function getJson(url, opts = {}) {
+  const { timeout = 10000, ...init } = opts;
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 10000);
+  const timer = setTimeout(() => ctl.abort(), timeout);
   try {
-    const r = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", signal: ctl.signal, ...opts });
+    const r = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", signal: ctl.signal, ...init });
     if (r.status === 404) return null;
     if (!r.ok) throw new Error(url + " " + r.status);
     return await r.json();

@@ -373,3 +373,17 @@ test("keepWorking keeps a provider's emotes when its refresh fails", () => {
   // a real change (no failure) still goes through
   assert.deepEqual(L.keepWorking(prev, { ...fresh, seven: [{ n: "OMEGALUL" }], failed: {} }).seven, [{ n: "OMEGALUL" }]);
 });
+
+test("sevenTvV4Set maps v4 GraphQL items, sizing from the aspect ratio", () => {
+  const set = L.sevenTvV4Set([
+    { alias: "GAMBA", flags: { zeroWidth: false }, emote: { id: "01G3WEGZN0000ET2J0MQP5YJ0G", defaultName: "GAMBA", flags: { animated: true }, aspectRatio: 1.2109375 } },
+    { alias: null, flags: { zeroWidth: true }, emote: { id: "01ABC", defaultName: "RainTime", flags: { animated: false }, aspectRatio: 1 } },
+    { alias: "bad name", emote: { id: "01DEF" } },
+    { alias: "NoEmote" },
+    null
+  ]);
+  assert.equal(set.length, 2);
+  assert.deepEqual([set[0].n, set[0].a, set[0].z, set[0].w, set[0].h], ["GAMBA", true, false, 39, 32]);
+  assert.equal(set[0].s[0], "https://cdn.7tv.app/emote/01G3WEGZN0000ET2J0MQP5YJ0G/1x.webp");
+  assert.deepEqual([set[1].n, set[1].z, set[1].w], ["RainTime", true, 32]);
+});

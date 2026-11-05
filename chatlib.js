@@ -128,6 +128,21 @@
     return out;
   }
 
+  // 7TV v4 GraphQL emote-set items ({ alias, flags: { zeroWidth }, emote: { id, flags: { animated }, aspectRatio } })
+  // -> the same shape as sevenTvSet. v4 gives an aspect ratio rather than image sizes; 7TV's 1x images are 32 px tall.
+  function sevenTvV4Set(items) {
+    return sevenTvSet((Array.isArray(items) ? items : []).map((x) => {
+      const em = x && x.emote;
+      if (!em) return null;
+      const ratio = Number(em.aspectRatio) > 0 ? Number(em.aspectRatio) : 1;
+      return {
+        name: x.alias || em.defaultName,
+        flags: x.flags && x.flags.zeroWidth ? 1 : 0,
+        data: { id: em.id, animated: !!(em.flags && em.flags.animated), host: { files: [{ name: "1x.webp", width: Math.round(32 * ratio), height: 32 }] } }
+      };
+    }));
+  }
+
   // ---------- BTTV ----------
 
   // BTTV's global overlay emotes (drawn on top of the emote before them)
@@ -631,7 +646,7 @@
   }
 
   const API = {
-    parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet,
+    parseIrc, parseBadges, ircEvent, unescapeTag, sevenTvEmote, sevenTvSet, sevenTvV4Set,
     bttvEmote, ffzEmote, ffzSets, mergeEmotes, apply7tvChange, sevenEntitlement,
     splitList, compileTerms, matchTerms, loginSet, msgKey, spamDetector, topEmotes, fmtDuration,
     unmutePlaylist, learnRecord, rankEmotes, LEVEL_PRESETS, LEVEL_TARGET, levelerStep, keepWorking, ttsText, pinKey, addPin, endPin
