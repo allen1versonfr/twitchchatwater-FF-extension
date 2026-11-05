@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.10.1
+
+- **Fixed 7TV channel emotes never loading on big channels.** 7TV's v3 API sends a channel's whole emote set with every
+  image variant (2+ MB for a 1000-emote channel) and often took 15–40 seconds, or gave up with a 504. The extension stopped
+  waiting after 10 seconds, so the lookup failed every time and the retry added in 3.10.0 couldn't help. Channel emotes
+  now come from 7TV's v4 API, which returns only the fields the extension uses (about 140 KB) in a few seconds. v3 is
+  kept as a fallback, and 7TV requests now wait up to 60 seconds.
+
 ## 3.10.0
 
 - **Fixed 7TV emotes that stopped working.** Emote lists are refreshed every 10 minutes; if 7TV (or Twitch's channel
